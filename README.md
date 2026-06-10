@@ -45,21 +45,21 @@ polling cost stays bounded).
 ## Demo
 
 ```sh
-just demo   # seeds ./demo-data with a local DB (writes!), then serves it
+# Seed ./demo-data with a local DB (this is the only tool here that writes;
+# the dashboard itself never does), then serve it:
+cargo run --bin seed
+CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
 ```
 
-The seed tool is the only thing here that writes; the dashboard itself never
-does.
+Note: `LOCAL_PATH` must be absolute — the object store canonicalizes it.
 
 ## Development
 
 ```sh
-just run        # backend on :8333
-just dev-web    # Vite dev server on :5173, proxies /api to :8333
-just test       # unit tests
-just smoke      # curl every endpoint against a running server
-just build      # release binary with the frontend embedded
-```
+npm run dev --prefix web    # Vite dev server on :5173, proxies /api to :8333
+cargo test                  # unit tests
+./scripts/smoke.sh          # curl every endpoint against a running server
 
-The frontend is embedded into the release binary via `rust-embed`, so the
-deployable artifact is a single file.
+# Release binary with the frontend embedded (single-file deploy):
+npm run build --prefix web && cargo build --release
+```

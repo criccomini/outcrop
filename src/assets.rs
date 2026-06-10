@@ -20,7 +20,7 @@ pub async fn static_handler(uri: Uri) -> Response {
         Some(content) => Html(content.data).into_response(),
         None => (
             StatusCode::NOT_FOUND,
-            "frontend not built — run `just build-web` (or use the Vite dev server)",
+            "frontend not built — run `npm run build --prefix web` (or use the Vite dev server)",
         )
             .into_response(),
     }
