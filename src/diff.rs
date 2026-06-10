@@ -4,11 +4,17 @@ use crate::dto::*;
 
 /// Diff two manifests (as DTOs), keyed by stable identifiers: L0 view ULIDs,
 /// sorted-run ids, checkpoint UUIDs, external-db source checkpoint ids.
+/// L0 and runs are diffed across the union of the root tree and all segment
+/// trees — slatedb allocates sorted-run ids globally (`next_global_sr_id`
+/// maxes over every tree), so an id identifies one run regardless of which
+/// segment holds it.
 pub fn diff_manifests(a: &ManifestDto, b: &ManifestDto) -> ManifestDiffDto {
-    let (l0_added, l0_removed) = diff_ssts(&a.tree.l0, &b.tree.l0);
+    let (l0_added, l0_removed) = diff_ssts(&all_l0(a), &all_l0(b));
 
-    let a_runs: BTreeMap<u32, &SortedRunDto> = a.tree.runs.iter().map(|r| (r.id, r)).collect();
-    let b_runs: BTreeMap<u32, &SortedRunDto> = b.tree.runs.iter().map(|r| (r.id, r)).collect();
+    let a_runs: BTreeMap<u32, &SortedRunDto> =
+        all_runs(a).into_iter().map(|r| (r.id, r)).collect();
+    let b_runs: BTreeMap<u32, &SortedRunDto> =
+        all_runs(b).into_iter().map(|r| (r.id, r)).collect();
     let mut runs_added = vec![];
     let mut runs_removed = vec![];
     let mut runs_changed = vec![];
@@ -16,7 +22,10 @@ pub fn diff_manifests(a: &ManifestDto, b: &ManifestDto) -> ManifestDiffDto {
         match a_runs.get(id) {
             None => runs_added.push(run_summary(run)),
             Some(a_run) => {
-                let (ssts_added, ssts_removed) = diff_ssts(&a_run.ssts, &run.ssts);
+                let (ssts_added, ssts_removed) = diff_ssts(
+                    &a_run.ssts.iter().collect::<Vec<_>>(),
+                    &run.ssts.iter().collect::<Vec<_>>(),
+                );
                 if !ssts_added.is_empty() || !ssts_removed.is_empty() {
                     runs_changed.push(RunChangeDto {
                         id: *id,
@@ -207,19 +216,37 @@ pub fn summarize_diff(d: &ManifestDiffDto) -> DiffSummaryDto {
     }
 }
 
+/// L0 SSTs across the root tree and every segment tree.
+fn all_l0(m: &ManifestDto) -> Vec<&SstViewDto> {
+    m.tree
+        .l0
+        .iter()
+        .chain(m.segments.iter().flat_map(|s| s.tree.l0.iter()))
+        .collect()
+}
+
+/// Sorted runs across the root tree and every segment tree.
+fn all_runs(m: &ManifestDto) -> Vec<&SortedRunDto> {
+    m.tree
+        .runs
+        .iter()
+        .chain(m.segments.iter().flat_map(|s| s.tree.runs.iter()))
+        .collect()
+}
+
 /// Added/removed SSTs between two lists, keyed by view id.
-fn diff_ssts(a: &[SstViewDto], b: &[SstViewDto]) -> (Vec<SstViewDto>, Vec<SstViewDto>) {
+fn diff_ssts(a: &[&SstViewDto], b: &[&SstViewDto]) -> (Vec<SstViewDto>, Vec<SstViewDto>) {
     let a_ids: BTreeSet<&str> = a.iter().map(|s| s.view_id.as_str()).collect();
     let b_ids: BTreeSet<&str> = b.iter().map(|s| s.view_id.as_str()).collect();
     let added = b
         .iter()
         .filter(|s| !a_ids.contains(s.view_id.as_str()))
-        .cloned()
+        .map(|s| (*s).clone())
         .collect();
     let removed = a
         .iter()
         .filter(|s| !b_ids.contains(s.view_id.as_str()))
-        .cloned()
+        .map(|s| (*s).clone())
         .collect();
     (added, removed)
 }
@@ -351,6 +378,41 @@ mod tests {
         assert!(fields.contains(&"next_wal_sst_id"));
         assert!(fields.contains(&"writer_epoch"));
         assert_eq!(fields.len(), 2);
+    }
+
+    #[test]
+    fn segment_tree_changes_are_diffed() {
+        let segment = |l0: Vec<SstViewDto>, runs: Vec<SortedRunDto>| {
+            let l0_bytes = l0.iter().map(|s| s.est_bytes).sum::<u64>();
+            let total_bytes = l0_bytes + runs.iter().map(|r| r.est_bytes).sum::<u64>();
+            SegmentDto {
+                prefix: KeyDto {
+                    hex: "7430302f".to_string(),
+                    utf8: Some("t00/".to_string()),
+                },
+                tree: TreeDto {
+                    l0,
+                    runs,
+                    l0_bytes,
+                    total_bytes,
+                },
+            }
+        };
+        let mut a = manifest(1, vec![], vec![]);
+        a.segments = vec![segment(vec![sst("s1", 10)], vec![run(5, vec![sst("x", 10)])])];
+        let mut b = manifest(2, vec![], vec![]);
+        b.segments = vec![segment(
+            vec![sst("s1", 10), sst("s2", 20)],
+            vec![run(5, vec![sst("x", 10), sst("y", 15)])],
+        )];
+        let d = diff_manifests(&a, &b);
+        assert_eq!(d.l0_added.len(), 1, "segment flush must show as L0 added");
+        assert_eq!(d.l0_added[0].view_id, "s2");
+        assert_eq!(d.runs_changed.len(), 1);
+        assert_eq!(d.runs_changed[0].id, 5);
+        assert_eq!(d.runs_changed[0].ssts_added[0].view_id, "y");
+        assert!(d.segments_added.is_empty());
+        assert!(d.segments_removed.is_empty());
     }
 
     #[test]
