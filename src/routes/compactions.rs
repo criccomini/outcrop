@@ -45,7 +45,10 @@ pub async fn list(
 ) -> Result<Json<Vec<VersionedCompactionsDto>>, ApiError> {
     let limit = params.limit.unwrap_or(20).min(200).max(1);
     let range = match (params.start, params.end) {
-        (Some(s), Some(e)) => s..=e,
+        // Anchor to `end` so the newest `limit` versions of the requested
+        // range are returned; each version is one object-store GET, so an
+        // explicit range must not bypass the cap.
+        (Some(s), Some(e)) => e.saturating_sub(limit - 1).max(s)..=e,
         (Some(s), None) => s..=s.saturating_add(limit - 1),
         (None, end) => {
             let end = match end {
