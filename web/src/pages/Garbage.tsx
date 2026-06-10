@@ -213,9 +213,10 @@ function ObservedDeletions() {
             </div>
           )}
           <p className="mt-3 text-xs text-ink-5">
-            Inferred by diffing listings between refreshes (observing since{' '}
-            {formatRelative(d.observing_since)}); in-memory, so restarts
-            clear it.{' '}
+            Inferred by diffing periodic listings (observing since{' '}
+            {formatRelative(d.observing_since)}); data-file deletions
+            register at the next reconciling sweep — about a minute apart,
+            longer on very large DBs. In-memory, so restarts clear it.{' '}
             <Link
               to={dbPath('/activity?kinds=gc')}
               className="text-accent hover:text-accent-high"
