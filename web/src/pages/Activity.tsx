@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useActivity, useCompactions, useCompactorState } from '../api/client'
 import type { ActivityDto, VersionedCompactionsDto } from '../api/types'
 import { Panel } from '../components/Panel'
@@ -27,6 +27,15 @@ const KIND_LABEL: Record<FeedKind, string> = {
   clone: 'clone',
   meta: 'bookkeeping',
 }
+
+const ALL_KINDS: FeedKind[] = [
+  'flush',
+  'compaction',
+  'gc',
+  'checkpoint',
+  'clone',
+  'meta',
+]
 
 interface Row {
   key: string
@@ -145,6 +154,63 @@ function KindChip({ kind }: { kind: FeedKind }) {
   )
 }
 
+/**
+ * Toggleable kind chips; an empty selection means "show everything". Kinds
+ * absent from the current window are hidden unless still selected.
+ */
+function FilterBar({
+  counts,
+  selected,
+  onChange,
+}: {
+  counts: Map<FeedKind, number>
+  selected: Set<FeedKind>
+  onChange: (next: Set<FeedKind>) => void
+}) {
+  const visible = ALL_KINDS.filter((k) => (counts.get(k) ?? 0) > 0 || selected.has(k))
+  const toggle = (k: FeedKind) => {
+    const next = new Set(selected)
+    if (next.has(k)) next.delete(k)
+    else next.add(k)
+    onChange(next)
+  }
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5 border-b border-ink-7/50 pb-3 text-xs">
+      <span className="mr-1 text-ink-5">Show:</span>
+      <button
+        onClick={() => onChange(new Set())}
+        className={`rounded-full border px-2.5 py-0.5 font-medium transition-colors ${
+          selected.size === 0
+            ? 'border-ink-4 bg-ink-2 text-surface-1'
+            : 'border-ink-6 bg-surface-1 text-ink-4 hover:bg-surface-2'
+        }`}
+      >
+        all
+      </button>
+      {visible.map((k) => {
+        const active = selected.has(k)
+        return (
+          <button
+            key={k}
+            onClick={() => toggle(k)}
+            className={`rounded-full border px-2.5 py-0.5 font-medium transition-colors ${
+              active
+                ? `${KIND_STYLE[k]} ring-1 ring-current`
+                : 'border-ink-6 bg-surface-1 text-ink-5 hover:bg-surface-2'
+            }`}
+          >
+            {active && <span className="mr-1">✓</span>}
+            {KIND_LABEL[k]}
+            <span className={active ? 'ml-1 opacity-70' : 'ml-1 text-ink-6'}>
+              {counts.get(k) ?? 0}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function CompactingNow() {
   const state = useCompactorState()
   const active = state.data?.compactions?.compactions.filter((c) => c.active) ?? []
@@ -182,6 +248,18 @@ function CompactingNow() {
 export default function Activity() {
   const query = useActivity(50)
   const compactions = useCompactions()
+  const [params, setParams] = useSearchParams()
+  const selected = new Set(
+    (params.get('kinds')?.split(',') ?? []).filter((k): k is FeedKind =>
+      (ALL_KINDS as string[]).includes(k),
+    ),
+  )
+  const setSelected = (next: Set<FeedKind>) => {
+    const p = new URLSearchParams(params)
+    if (next.size === 0 || next.size === ALL_KINDS.length) p.delete('kinds')
+    else p.set('kinds', [...next].join(','))
+    setParams(p, { replace: true })
+  }
   return (
     <div>
       <h1 className="text-3xl">Activity</h1>
@@ -189,18 +267,33 @@ export default function Activity() {
         <CompactingNow />
         <QueryGate query={query}>
           {(items) => {
-            const rows = transitionRows(items)
-            if (rows.length > 0) {
-              const oldestAt = Math.min(...rows.map((r) => r.atOldest ?? r.at))
-              rows.push(...failedJobRows(compactions.data ?? [], oldestAt))
-              rows.sort((a, b) => b.at - a.at)
+            const all = transitionRows(items)
+            if (all.length > 0) {
+              const oldestAt = Math.min(...all.map((r) => r.atOldest ?? r.at))
+              all.push(...failedJobRows(compactions.data ?? [], oldestAt))
+              all.sort((a, b) => b.at - a.at)
             }
+            const counts = new Map<FeedKind, number>()
+            for (const r of all) counts.set(r.kind, (counts.get(r.kind) ?? 0) + 1)
+            const rows =
+              selected.size === 0 ? all : all.filter((r) => selected.has(r.kind))
             return (
               <Panel>
-                {rows.length === 0 ? (
+                {all.length > 0 && (
+                  <FilterBar
+                    counts={counts}
+                    selected={selected}
+                    onChange={setSelected}
+                  />
+                )}
+                {all.length === 0 ? (
                   <span className="text-sm text-ink-5">
                     Only one manifest version retained — no transitions to show
                     yet.
+                  </span>
+                ) : rows.length === 0 ? (
+                  <span className="text-sm text-ink-5">
+                    No events of the selected types in this window.
                   </span>
                 ) : (
                   <ol>
@@ -250,6 +343,11 @@ export default function Activity() {
                   </ol>
                 )}
                 <p className="mt-3 text-xs text-ink-5">
+                  {selected.size > 0 && (
+                    <>
+                      Showing {rows.length} of {all.length} events.{' '}
+                    </>
+                  )}
                   Newest first. Runs of consecutive flushes are grouped into one
                   entry; every entry links to its manifest diff. In-flight
                   compactions appear in the strip above, failed ones in the
