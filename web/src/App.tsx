@@ -349,9 +349,6 @@ export default function App() {
                 {dbId}
               </span>
             )}
-            <span className="rounded-full border border-ink-6 bg-surface-2 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-ink-4">
-              read-only
-            </span>
             <RefreshTimer />
           </div>
         </div>

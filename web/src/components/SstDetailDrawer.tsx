@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSst } from '../api/client'
 import { formatBytes, formatTime } from '../lib/format'
 import { KeyDisplay } from './KeyDisplay'
@@ -28,6 +29,13 @@ export function SstDetailDrawer({
   onClose: () => void
 }) {
   const query = useSst(ulid)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   return (
     <aside className="fixed inset-y-0 right-0 z-30 w-full max-w-[26rem] overflow-y-auto border-l border-ink-7 bg-surface-1 p-5 shadow-lg xl:top-14 xl:z-10">
       <div className="flex items-start justify-between gap-2">
