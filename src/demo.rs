@@ -421,7 +421,9 @@ async fn run_one(
                 deletes += 1;
             } else {
                 // 20% inserts of fresh keys, 70% updates of existing ones.
-                let k = if roll <= 2 {
+                // No keys yet (--waves 0 / --keys-per-wave 0 seed nothing):
+                // fall back to an insert instead of a modulo-by-zero.
+                let k = if roll <= 2 || seeded + inserted == 0 {
                     inserted += 1;
                     scatter(seeded + inserted - 1)
                 } else {
