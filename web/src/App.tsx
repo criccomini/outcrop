@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import {
   matchPath,
   Navigate,
@@ -94,36 +94,43 @@ function DbArea() {
   }
   const { path, page, arg } = splitDbSplat(splat)
   if (path === '') return <Fleet store={store} />
-  switch (page) {
-    case 'alerts':
-      return <Alerts />
-    case 'activity':
-      return <Activity />
-    case 'lsm':
-      return <Lsm />
-    case 'wal':
-      return <Wal />
-    case 'manifests':
-      return <Manifests />
-    case 'manifests/diff':
-      return <ManifestDiff />
-    case 'manifests/id':
-      return <ManifestDetail id={arg ?? ''} />
-    case 'compactions':
-      return <Compactions />
-    case 'compactions/diff':
-      return <CompactionsDiff />
-    case 'compactions/id':
-      return <CompactionsVersion id={arg ?? ''} />
-    case 'compactions/job':
-      return <CompactionJob id={arg ?? ''} />
-    case 'checkpoints':
-      return <Checkpoints />
-    case 'garbage':
-      return <Garbage />
-    default:
-      return <Overview />
-  }
+  const pageEl = (() => {
+    switch (page) {
+      case 'alerts':
+        return <Alerts />
+      case 'activity':
+        return <Activity />
+      case 'lsm':
+        return <Lsm />
+      case 'wal':
+        return <Wal />
+      case 'manifests':
+        return <Manifests />
+      case 'manifests/diff':
+        return <ManifestDiff />
+      case 'manifests/id':
+        return <ManifestDetail id={arg ?? ''} />
+      case 'compactions':
+        return <Compactions />
+      case 'compactions/diff':
+        return <CompactionsDiff />
+      case 'compactions/id':
+        return <CompactionsVersion id={arg ?? ''} />
+      case 'compactions/job':
+        return <CompactionJob id={arg ?? ''} />
+      case 'checkpoints':
+        return <Checkpoints />
+      case 'garbage':
+        return <Garbage />
+      default:
+        return <Overview />
+    }
+  })()
+  // Keyed by DB id: pages keep UI state (segment tab, open drawer, diff
+  // picks) in useState, and the DB switcher changes neither the element
+  // type nor its position, so React would otherwise carry that state —
+  // valid only for the previous DB — onto the new one.
+  return <Fragment key={`${store}:${path}`}>{pageEl}</Fragment>
 }
 
 const NAV_LINK_STYLE = ({ isActive }: { isActive: boolean }) =>
