@@ -19,27 +19,23 @@ export default function Overview() {
                 label="Total size"
                 value={formatBytes(o.est_total_bytes)}
                 sub={`L0: ${formatBytes(o.l0_bytes)}`}
+                to={dbPath('/lsm')}
               />
               <Stat
                 label="SSTs"
                 value={o.sst_count.toLocaleString()}
                 sub={`${o.l0_count} in L0 · ${o.sorted_run_count} sorted runs`}
+                to={dbPath('/lsm')}
               />
               <Stat
                 label="Manifest"
-                value={
-                  <Link
-                    to={dbPath(`/manifests/${o.manifest_id}`)}
-                    className="text-accent hover:text-accent-high"
-                  >
-                    #{o.manifest_id}
-                  </Link>
-                }
+                value={`#${o.manifest_id}`}
                 sub={`${o.manifest_count} versions retained${
                   o.oldest_manifest_id !== undefined
                     ? ` (oldest #${o.oldest_manifest_id})`
                     : ''
                 }`}
+                to={dbPath(`/manifests/${o.manifest_id}`)}
               />
               <Stat
                 label="Last L0 write"
@@ -53,6 +49,7 @@ export default function Overview() {
                     ? `${formatTime(o.last_l0_approx_time)} · seq ${o.last_l0_seq.toLocaleString()}`
                     : `seq ${o.last_l0_seq.toLocaleString()}`
                 }
+                to={dbPath('/activity')}
               />
               <Stat
                 label="WAL window"
@@ -60,6 +57,7 @@ export default function Overview() {
                   o.next_wal_sst_id - 1 - o.replay_after_wal_id
                 ).toLocaleString()}
                 sub={`replay after #${o.replay_after_wal_id} · next #${o.next_wal_sst_id}`}
+                to={dbPath('/wal')}
               />
               <Stat
                 label="Epochs"
@@ -68,19 +66,13 @@ export default function Overview() {
               />
               <Stat
                 label="Checkpoints"
-                value={
-                  <Link
-                    to={dbPath('/checkpoints')}
-                    className="text-accent hover:text-accent-high"
-                  >
-                    {o.checkpoint_count}
-                  </Link>
-                }
+                value={o.checkpoint_count}
                 sub={
                   o.clone_count > 0
                     ? `${o.clone_count} clone parent${o.clone_count > 1 ? 's' : ''}`
                     : 'no clone parents'
                 }
+                to={dbPath('/checkpoints')}
               />
               <Stat
                 label="Segments"
@@ -90,6 +82,7 @@ export default function Overview() {
                     ? `WAL store: ${o.wal_object_store_uri}`
                     : 'single object store'
                 }
+                to={o.segment_count > 0 ? dbPath('/lsm') : undefined}
               />
             </div>
           </div>

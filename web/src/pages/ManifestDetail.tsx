@@ -11,7 +11,7 @@ export default function ManifestDetail({ id }: { id: string }) {
 
   return (
     <div>
-      <div className="flex items-baseline gap-4">
+      <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-3xl">Manifest #{id}</h1>
         <Link to={dbPath('/manifests')} className="text-sm text-accent hover:text-accent-high">
           ← all manifests

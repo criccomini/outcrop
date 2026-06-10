@@ -40,7 +40,7 @@ export default function ManifestDiff() {
 
   return (
     <div>
-      <div className="flex items-baseline gap-4">
+      <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-3xl">
           Diff{' '}
           <Link

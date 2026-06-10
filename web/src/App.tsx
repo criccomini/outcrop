@@ -173,21 +173,39 @@ function SidebarNav({
       {dbId !== null && (
         <>
           {!collapsed && list.length > 1 && (
-            <select
-              value={dbId}
-              onChange={(e) => {
-                navigate(dbUrl(e.target.value, subPath))
-                onNavigate?.()
-              }}
-              className="mt-2 w-full rounded-md border border-ink-6 bg-surface-1 px-2 py-1.5 text-sm text-ink-2"
-              aria-label="Switch database"
-            >
-              {list.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.path} ({d.store})
-                </option>
-              ))}
-            </select>
+            <div className="relative mt-2">
+              <select
+                value={dbId}
+                onChange={(e) => {
+                  navigate(dbUrl(e.target.value, subPath))
+                  onNavigate?.()
+                }}
+                // appearance-none + a hand-placed chevron: the native caret
+                // hugs the right border with no inset.
+                className="w-full appearance-none rounded-md border border-ink-6 bg-surface-1 py-1.5 pl-2 pr-8 text-sm text-ink-2"
+                aria-label="Switch database"
+              >
+                {list.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.path} ({d.store})
+                  </option>
+                ))}
+              </select>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-4"
+                aria-hidden
+              >
+                <path d="M5 8l5 5 5-5" />
+              </svg>
+            </div>
           )}
           <div className="mt-2 flex flex-col gap-0.5 border-t border-ink-7/60 pt-2">
             {NAV.map((item) => (

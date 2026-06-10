@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 export function Panel({
   title,
@@ -26,18 +27,30 @@ export function Stat({
   label,
   value,
   sub,
+  to,
 }: {
   label: string
   value: ReactNode
   sub?: ReactNode
+  /** Makes the whole tile a link. */
+  to?: string
 }) {
-  return (
-    <div className="rounded-lg border border-ink-7/60 bg-surface-1 px-4 py-3 shadow-sm">
+  const body = (
+    <>
       <div className="text-xs font-semibold uppercase tracking-wider text-ink-5">
         {label}
       </div>
       <div className="mt-1 text-2xl text-ink-1">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-ink-4">{sub}</div>}
-    </div>
+    </>
   )
+  const style = 'rounded-lg border border-ink-7/60 bg-surface-1 px-4 py-3 shadow-sm'
+  if (to) {
+    return (
+      <Link to={to} className={`${style} block transition-colors hover:border-ink-5`}>
+        {body}
+      </Link>
+    )
+  }
+  return <div className={style}>{body}</div>
 }
