@@ -253,6 +253,18 @@ async fn seed_base(
 /// Per-DB rate factors so the fleet looks heterogeneous in the dashboard.
 const RATE_FACTORS: [f64; 3] = [1.0, 0.45, 0.2];
 
+/// Traffic inserts scatter across a fixed 2^26 keyspace via a
+/// multiplicative bijection (odd constant, power-of-two modulus) instead of
+/// appending ever-increasing ids — otherwise newer SSTs always cover
+/// higher key ranges and the dashboard's key-range view degenerates into a
+/// recency staircase. The bijection keeps inserts collision-free while
+/// letting updates re-derive any existing key from its insertion index.
+const KEYSPACE_MASK: u64 = (1 << 26) - 1;
+
+fn scatter(i: u64) -> u64 {
+    i.wrapping_mul(0x9E37_79B1) & KEYSPACE_MASK
+}
+
 /// Seed one DB when missing, then write puts/deletes until cancelled.
 async fn run_one(
     args: Arc<TrafficArgs>,
@@ -273,8 +285,10 @@ async fn run_one(
     let phase_offset = (idx as f64) * 60.0;
 
     let db = open_traffic_db(&db_path, store.clone()).await?;
-    // Churn the seeded keyspace, extend past it on inserts.
-    let mut key_high = (args.waves * args.keys_per_wave) as u64;
+    // The seed wrote dense keys [0, seeded); traffic inserts scatter from
+    // index `seeded` upward so they never collide with each other.
+    let seeded = (args.waves * args.keys_per_wave) as u64;
+    let mut inserted: u64 = 0;
     let mut rng = Lcg(0xC0FFEE + idx as u64);
     let write_opts = WriteOptions {
         await_durable: false,
@@ -306,21 +320,31 @@ async fn run_one(
         let mult = 0.2 + 0.8 * (0.5 * (1.0 + phase.sin()));
         let ops = (rate * mult / 10.0).round() as u64;
 
+        // Any existing key, by index: dense seeded lows, scattered inserts
+        // above.
+        let existing = |r: u64, inserted: u64| {
+            let j = r % (seeded + inserted);
+            if j < seeded {
+                j
+            } else {
+                scatter(j)
+            }
+        };
         for _ in 0..ops {
             let roll = rng.next() % 10;
             if roll == 0 && puts > 0 {
                 // 10% deletes of a random existing key.
-                let k = rng.next() % key_high;
+                let k = existing(rng.next(), inserted);
                 db.delete_with_options(format!("user:{k:08}"), &write_opts)
                     .await?;
                 deletes += 1;
             } else {
                 // 20% inserts of fresh keys, 70% updates of existing ones.
                 let k = if roll <= 2 {
-                    key_high += 1;
-                    key_high - 1
+                    inserted += 1;
+                    scatter(seeded + inserted - 1)
                 } else {
-                    rng.next() % key_high
+                    existing(rng.next(), inserted)
                 };
                 let key = format!("user:{k:08}");
                 let len = 64 + (rng.next() % 512) as usize;
@@ -360,9 +384,10 @@ async fn run_one(
         if last_report.elapsed() >= Duration::from_secs(10) {
             let actual = ops_since_report as f64 / last_report.elapsed().as_secs_f64();
             println!(
-                "[{db_path}] [t+{:>4}s] {actual:.0} ops/s (target {:.0}) · {puts} puts · {deletes} deletes · keyspace {key_high}",
+                "[{db_path}] [t+{:>4}s] {actual:.0} ops/s (target {:.0}) · {puts} puts · {deletes} deletes · {} keys",
                 started.elapsed().as_secs(),
                 rate * mult,
+                seeded + inserted,
             );
             last_report = Instant::now();
             ops_since_report = 0;
