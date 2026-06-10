@@ -14,21 +14,6 @@ export default function Overview() {
       <QueryGate query={query}>
         {(o) => (
           <div className="mt-6">
-            <div className="mb-4 text-sm text-ink-4">
-              <span className="font-mono">
-                {o.provider}://{o.db_path}
-              </span>
-              {o.latest_manifest_written_at && (
-                <span className="ml-3">
-                  manifest updated {formatRelative(o.latest_manifest_written_at)}
-                </span>
-              )}
-              {!o.initialized && (
-                <span className="ml-3 font-semibold text-accent-high">
-                  not initialized
-                </span>
-              )}
-            </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <Stat
                 label="Total size"
