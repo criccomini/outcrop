@@ -25,9 +25,10 @@ pub async fn get_one(
     }
 
     let file = state.sst_reader.open(ulid).await.map_err(|e| {
-        ApiError::NotFound(format!(
-            "SST {ulid} could not be opened (possibly GC'd): {e}"
-        ))
+        // The underlying error embeds object-store details (e.g. local
+        // filesystem paths); log it server-side, don't return it.
+        tracing::debug!("opening SST {ulid}: {e}");
+        ApiError::NotFound(format!("SST {ulid} could not be opened (possibly GC'd)"))
     })?;
 
     let meta = file.metadata().await.map_err(ApiError::from)?;
