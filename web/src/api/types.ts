@@ -251,6 +251,20 @@ export interface ManifestDiffDto {
   scalars: ScalarChangeDto[]
 }
 
+export interface WalSstDto {
+  id: number
+  size_bytes: number
+  last_modified: string
+}
+
+export interface WalDto {
+  next_wal_sst_id: number
+  replay_after_wal_id: number
+  total_bytes: number
+  wal_object_store_uri?: string
+  entries: WalSstDto[]
+}
+
 export interface ActivityDto {
   a: number
   b: number

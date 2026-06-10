@@ -8,11 +8,13 @@ import ManifestDetail from './pages/ManifestDetail'
 import ManifestDiff from './pages/ManifestDiff'
 import Compactions from './pages/Compactions'
 import Checkpoints from './pages/Checkpoints'
+import Wal from './pages/Wal'
 
 const NAV = [
   { to: '/', label: 'Overview' },
   { to: '/activity', label: 'Activity' },
   { to: '/lsm', label: 'LSM Tree' },
+  { to: '/wal', label: 'WAL' },
   { to: '/manifests', label: 'Manifests' },
   { to: '/compactions', label: 'Compactions' },
   { to: '/checkpoints', label: 'Checkpoints' },
@@ -63,6 +65,7 @@ export default function App() {
           <Route path="/" element={<Overview />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/lsm" element={<Lsm />} />
+          <Route path="/wal" element={<Wal />} />
           <Route path="/manifests" element={<Manifests />} />
           <Route path="/manifests/diff" element={<ManifestDiff />} />
           <Route path="/manifests/:id" element={<ManifestDetail />} />

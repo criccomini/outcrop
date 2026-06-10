@@ -316,6 +316,24 @@ pub struct ManifestDiffDto {
     pub scalars: Vec<ScalarChangeDto>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct WalSstDto {
+    pub id: u64,
+    pub size_bytes: u64,
+    pub last_modified: DateTime<Utc>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct WalDto {
+    pub next_wal_sst_id: u64,
+    pub replay_after_wal_id: u64,
+    pub total_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wal_object_store_uri: Option<String>,
+    /// Newest first.
+    pub entries: Vec<WalSstDto>,
+}
+
 /// One manifest transition (a → b) in the activity feed.
 #[derive(Serialize, Clone, Debug)]
 pub struct ActivityDto {

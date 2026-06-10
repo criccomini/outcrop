@@ -22,6 +22,14 @@ pub struct ManifestEntry {
     pub last_modified: DateTime<Utc>,
 }
 
+/// A WAL SST as seen by a raw object-store listing.
+#[derive(Clone, Debug)]
+pub struct WalEntry {
+    pub id: u64,
+    pub size_bytes: u64,
+    pub last_modified: DateTime<Utc>,
+}
+
 pub struct AppState {
     pub admin: Admin,
     pub sst_reader: SstReader,
@@ -31,6 +39,7 @@ pub struct AppState {
     pub provider: String,
     pub latest_manifest: TtlCache<Option<VersionedManifest>>,
     pub manifest_listing: TtlCache<Vec<ManifestEntry>>,
+    pub wal_listing: TtlCache<Vec<WalEntry>>,
     pub compactor_state: TtlCache<CompactorStateDto>,
     pub manifest_by_id: LruMap<u64, VersionedManifest>,
     pub sst_details: LruMap<Ulid, SstDetailDto>,
@@ -54,6 +63,7 @@ impl AppState {
             provider,
             latest_manifest: TtlCache::new(ttl),
             manifest_listing: TtlCache::new(ttl),
+            wal_listing: TtlCache::new(ttl),
             compactor_state: TtlCache::new(ttl),
             manifest_by_id: LruMap::new(256),
             sst_details: LruMap::new(64),
@@ -94,6 +104,39 @@ impl AppState {
                     };
                     entries.push(ManifestEntry {
                         id,
+                        last_modified: meta.last_modified,
+                    });
+                }
+                entries.sort_by_key(|e| e.id);
+                Ok(entries)
+            })
+            .await
+    }
+
+    /// Listing of WAL SSTs, ascending by id. One object-store LIST.
+    pub async fn wal_entries(&self) -> Result<Arc<Vec<WalEntry>>, ApiError> {
+        self.wal_listing
+            .get_with(|| async {
+                let prefix = self.root_path.child("wal");
+                let mut stream = self.object_store.list(Some(&prefix));
+                let mut entries = Vec::new();
+                while let Some(meta) = stream
+                    .try_next()
+                    .await
+                    .map_err(|e| ApiError::Internal(format!("listing wal: {e}")))?
+                {
+                    let Some(name) = meta.location.filename() else {
+                        continue;
+                    };
+                    let Some(stem) = name.strip_suffix(".sst") else {
+                        continue;
+                    };
+                    let Ok(id) = stem.parse::<u64>() else {
+                        continue;
+                    };
+                    entries.push(WalEntry {
+                        id,
+                        size_bytes: meta.size,
                         last_modified: meta.last_modified,
                     });
                 }

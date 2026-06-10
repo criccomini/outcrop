@@ -12,6 +12,7 @@ import type {
   OverviewDto,
   SstDetailDto,
   VersionedCompactionsDto,
+  WalDto,
 } from './types'
 
 export class ApiRequestError extends Error {
@@ -99,6 +100,14 @@ export function useSst(ulid: string | null) {
     queryKey: ['sst', ulid],
     queryFn: () => fetchJson(`/api/ssts/${ulid}`),
     enabled: ulid !== null,
+  })
+}
+
+export function useWal() {
+  return useQuery<WalDto, ApiRequestError>({
+    queryKey: ['wal'],
+    queryFn: () => fetchJson('/api/wal'),
+    refetchInterval: LIVE_REFETCH_MS,
   })
 }
 

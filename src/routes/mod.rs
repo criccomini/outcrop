@@ -5,6 +5,7 @@ mod lsm;
 mod manifests;
 mod overview;
 mod ssts;
+mod wal;
 
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/overview", get(overview::overview))
         .route("/api/activity", get(activity::list))
         .route("/api/lsm", get(lsm::lsm))
+        .route("/api/wal", get(wal::wal))
         .route("/api/manifests", get(manifests::list))
         .route("/api/manifests/diff", get(manifests::diff))
         .route("/api/manifests/{id}", get(manifests::get_one))
