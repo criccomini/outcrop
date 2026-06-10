@@ -62,7 +62,13 @@ pub async fn lsm_summary(
     State(state): State<Arc<AppState>>,
     Query(params): Query<LsmSummaryParams>,
 ) -> Result<Json<Arc<LsmSummaryDto>>, ApiError> {
-    let seg_key = params.segment.map(|s| s as i64).unwrap_or(-1);
+    // try_from, not `as`: usize::MAX as i64 is -1, which would alias the
+    // root sentinel and serve the cached root summary for a bogus index.
+    let seg_key = match params.segment {
+        Some(s) => i64::try_from(s)
+            .map_err(|_| ApiError::BadRequest(format!("segment {s} out of range")))?,
+        None => -1,
+    };
     if let Some(id) = params.manifest_id {
         // Explicit ids can hit the cache without touching the store.
         if let Some(s) = state.lsm_summaries.get(&(id, seg_key)) {
