@@ -27,37 +27,45 @@ metadata reads, and object listings.
 
 ## Running
 
-The object store is configured through environment variables (or an
-`--env-file`), exactly like `slatedb-cli`:
+Everything is one binary. The object store is configured through environment
+variables (or an `--env-file`), exactly like `slatedb-cli`:
 
 ```sh
-# Local filesystem
+# UI + API together (the default; `serve` may be omitted)
 CLOUD_PROVIDER=local LOCAL_PATH=/path/to/store \
   slatedb-dashboard --path my-db
 
 # S3
 CLOUD_PROVIDER=aws AWS_BUCKET=my-bucket ... \
-  slatedb-dashboard --path my-db --listen 0.0.0.0:8333
+  slatedb-dashboard serve --path my-db --listen 0.0.0.0:8333
+
+# REST API only (no UI). CORS defaults to '*' in this mode so a ui-only
+# instance can call it from the browser; restrict with --cors-allow-origin.
+slatedb-dashboard serve --api-only --path my-db
+
+# UI only: serves just the SPA, with the API base baked into index.html —
+# the browser calls that API directly. No object-store config needed here.
+slatedb-dashboard serve --ui-only --api-url http://api-host:8333
 ```
 
-Flags: `--path` (DB root within the store, required), `--listen`
-(default `127.0.0.1:8333`), `--env-file`, `--cache-ttl-secs` (default 5 —
-object-store reads of mutable state are cached and shared across viewers, so
-polling cost stays bounded).
+Serve flags: `--path` (DB root within the store; required unless
+`--ui-only`), `--listen` (default `127.0.0.1:8333`), `--env-file`,
+`--cache-ttl-secs` (default 5 — object-store reads of mutable state are
+cached and shared across viewers, so polling cost stays bounded),
+`--api-only` / `--ui-only --api-url URL`, `--cors-allow-origin` (repeatable).
 
 ## Demo
 
 ```sh
-# Seed ./demo-data with a local DB (this is the only tool here that writes;
-# the dashboard itself never does), then serve it:
-cargo run --bin seed
-CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
+# Seed ./demo-data with a local DB if it doesn't exist yet, then simulate
+# live traffic against it until Ctrl-C (this is the only mode that writes;
+# the dashboard itself never does): puts/deletes at a slowly swinging rate,
+# embedded compactor and GC enabled, short-lived checkpoints every couple
+# of minutes.
+cargo run -- traffic                         # --rate, --checkpoint-secs
 
-# Or simulate live traffic (Ctrl-C to stop) and watch the dashboard move:
-# puts/deletes at a slowly swinging rate, embedded compactor and GC enabled,
-# short-lived checkpoints every couple of minutes. Works on a fresh dir or
-# on top of an existing demo DB.
-cargo run --bin seed -- --traffic            # --rate, --checkpoint-secs
+# Then watch it:
+CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
 ```
 
 Note: `LOCAL_PATH` must be absolute — the object store canonicalizes it.

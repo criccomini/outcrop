@@ -17,6 +17,16 @@ import type {
   WalDto,
 } from './types'
 
+declare global {
+  interface Window {
+    /** Injected into index.html by `serve --ui-only --api-url …`. */
+    SLATEDB_API_BASE?: string
+  }
+}
+
+/** Remote API origin in ui-only deployments; same-origin ('') otherwise. */
+const API_BASE = window.SLATEDB_API_BASE ?? ''
+
 export class ApiRequestError extends Error {
   status: number
 
@@ -27,7 +37,7 @@ export class ApiRequestError extends Error {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+  const res = await fetch(API_BASE + url)
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`
     try {

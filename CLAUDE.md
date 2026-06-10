@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A **read-only** web dashboard for inspecting a SlateDB database directly from object storage: a Rust (axum) API server plus a React SPA. The dashboard performs zero writes — only manifest reads, SST metadata reads, and object listings. The only thing in this repo that writes is `src/bin/seed.rs`, which generates the local demo database.
+A **read-only** web dashboard for inspecting a SlateDB database directly from object storage: a Rust (axum) API server plus a React SPA, shipped as a single binary (`serve` with UI+API/api-only/ui-only modes, plus a `traffic` demo subcommand). The dashboard performs zero writes — only manifest reads, SST metadata reads, and object listings. The only thing in this repo that writes is `src/demo.rs` (the `traffic` subcommand), which seeds and churns the local demo database.
 
 ## Workflow
 
@@ -13,14 +13,14 @@ Always commit after making progress (e.g. after each fix or coherent unit of wor
 ## Commands
 
 ```sh
-# Seed ./demo-data (once; pass --force to reseed), then run the server
-cargo run --bin seed
-CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
-# LOCAL_PATH must be absolute. Serves UI + API on 127.0.0.1:8333.
+# Seed ./demo-data if missing, then simulate live traffic until Ctrl-C:
+# varying-rate puts/deletes with the embedded compactor + GC enabled
+cargo run -- traffic
 
-# Continuous traffic simulation (Ctrl-C to stop): varying-rate puts/deletes
-# with the embedded compactor + GC enabled, for watching the dashboard live
-cargo run --bin seed -- --traffic
+# Run the server (UI + API on 127.0.0.1:8333; LOCAL_PATH must be absolute)
+CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
+# Also: serve --api-only (JSON + /metrics, CORS '*' by default), or
+# serve --ui-only --api-url http://host:8333 (SPA only, browser calls API)
 
 cargo test                          # backend unit tests
 cargo test diff::                   # single module (also: convert::, cache::)
