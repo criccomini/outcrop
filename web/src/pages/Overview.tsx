@@ -53,8 +53,9 @@ export default function Overview() {
               />
               <Stat
                 label="WAL window"
-                value={(
-                  o.next_wal_sst_id - 1 - o.replay_after_wal_id
+                value={Math.max(
+                  0,
+                  o.next_wal_sst_id - 1 - o.replay_after_wal_id,
                 ).toLocaleString()}
                 sub={`replay after #${o.replay_after_wal_id} · next #${o.next_wal_sst_id}`}
                 to={dbPath('/wal')}
