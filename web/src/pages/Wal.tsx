@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { useWal } from '../api/client'
 import { HelpTip } from '../components/HelpTip'
 import { Panel, Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
+import { WalSstDrawer } from '../components/WalSstDrawer'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
 export default function Wal() {
   const query = useWal()
+  const [selected, setSelected] = useState<number | null>(null)
   return (
     <div>
       <h1 className="text-3xl">WAL</h1>
@@ -81,9 +84,12 @@ export default function Wal() {
                         return (
                           <tr
                             key={e.id}
-                            className={`border-t border-ink-7/50 ${
+                            onClick={() =>
+                              setSelected(selected === e.id ? null : e.id)
+                            }
+                            className={`cursor-pointer border-t border-ink-7/50 hover:bg-surface-2 ${
                               unreplayed ? 'bg-accent-low/40' : ''
-                            }`}
+                            } ${selected === e.id ? 'bg-surface-2' : ''}`}
                           >
                             <td className="py-1.5 pr-4 font-mono text-xs">
                               #{e.id}
@@ -114,6 +120,17 @@ export default function Wal() {
                   </div>
                 )}
               </Panel>
+              {selected !== null &&
+                (() => {
+                  const entry = wal.entries.find((e) => e.id === selected)
+                  return entry ? (
+                    <WalSstDrawer
+                      entry={entry}
+                      replayAfterWalId={wal.replay_after_wal_id}
+                      onClose={() => setSelected(null)}
+                    />
+                  ) : null
+                })()}
             </div>
           )
         }}
