@@ -1,0 +1,691 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "SlateDB Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "SlateDB" [ref=e7]
+        - generic [ref=e8]: Dashboard
+      - navigation [ref=e9]:
+        - link "Overview" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "LSM Tree" [ref=e11] [cursor=pointer]:
+          - /url: /lsm
+        - link "Manifests" [ref=e12] [cursor=pointer]:
+          - /url: /manifests
+        - link "Compactions" [ref=e13] [cursor=pointer]:
+          - /url: /compactions
+        - link "Checkpoints" [ref=e14] [cursor=pointer]:
+          - /url: /checkpoints
+      - generic [ref=e15]:
+        - generic [ref=e16]: local://demo-db
+        - generic [ref=e17]: read-only
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - heading "Manifests" [level=1] [ref=e21]
+        - button "Diff two versions" [disabled] [ref=e22]
+      - generic [ref=e25]:
+        - table [ref=e26]:
+          - rowgroup [ref=e27]:
+            - row "ID Written L0 Runs SSTs Size Checkpoints Epochs (w/c)" [ref=e28]:
+              - columnheader [ref=e29]
+              - columnheader "ID" [ref=e30]
+              - columnheader "Written" [ref=e31]
+              - columnheader "L0" [ref=e32]
+              - columnheader "Runs" [ref=e33]
+              - columnheader "SSTs" [ref=e34]
+              - columnheader "Size" [ref=e35]
+              - columnheader "Checkpoints" [ref=e36]
+              - columnheader "Epochs (w/c)" [ref=e37]
+          - rowgroup [ref=e38]:
+            - row "#98 1m ago 7 2 9 8.7 MiB 16 2/3" [ref=e39]:
+              - cell [ref=e40]:
+                - checkbox [ref=e41]
+              - cell "#98" [ref=e42]:
+                - link "#98" [ref=e43] [cursor=pointer]:
+                  - /url: /manifests/98
+              - cell "1m ago" [ref=e44]
+              - cell "7" [ref=e45]
+              - cell "2" [ref=e46]
+              - cell "9" [ref=e47]
+              - cell "8.7 MiB" [ref=e48]
+              - cell "16" [ref=e49]
+              - cell "2/3" [ref=e50]
+            - row "#97 1m ago 7 2 9 8.7 MiB 15 2/3" [ref=e51]:
+              - cell [ref=e52]:
+                - checkbox [ref=e53]
+              - cell "#97" [ref=e54]:
+                - link "#97" [ref=e55] [cursor=pointer]:
+                  - /url: /manifests/97
+              - cell "1m ago" [ref=e56]
+              - cell "7" [ref=e57]
+              - cell "2" [ref=e58]
+              - cell "9" [ref=e59]
+              - cell "8.7 MiB" [ref=e60]
+              - cell "15" [ref=e61]
+              - cell "2/3" [ref=e62]
+            - row "#96 1m ago 7 2 9 8.7 MiB 15 2/3" [ref=e63]:
+              - cell [ref=e64]:
+                - checkbox [ref=e65]
+              - cell "#96" [ref=e66]:
+                - link "#96" [ref=e67] [cursor=pointer]:
+                  - /url: /manifests/96
+              - cell "1m ago" [ref=e68]
+              - cell "7" [ref=e69]
+              - cell "2" [ref=e70]
+              - cell "9" [ref=e71]
+              - cell "8.7 MiB" [ref=e72]
+              - cell "15" [ref=e73]
+              - cell "2/3" [ref=e74]
+            - row "#95 1m ago 5 2 7 8.5 MiB 15 2/3" [ref=e75]:
+              - cell [ref=e76]:
+                - checkbox [ref=e77]
+              - cell "#95" [ref=e78]:
+                - link "#95" [ref=e79] [cursor=pointer]:
+                  - /url: /manifests/95
+              - cell "1m ago" [ref=e80]
+              - cell "5" [ref=e81]
+              - cell "2" [ref=e82]
+              - cell "7" [ref=e83]
+              - cell "8.5 MiB" [ref=e84]
+              - cell "15" [ref=e85]
+              - cell "2/3" [ref=e86]
+            - row "#94 1m ago 4 2 6 8.4 MiB 15 2/3" [ref=e87]:
+              - cell [ref=e88]:
+                - checkbox [ref=e89]
+              - cell "#94" [ref=e90]:
+                - link "#94" [ref=e91] [cursor=pointer]:
+                  - /url: /manifests/94
+              - cell "1m ago" [ref=e92]
+              - cell "4" [ref=e93]
+              - cell "2" [ref=e94]
+              - cell "6" [ref=e95]
+              - cell "8.4 MiB" [ref=e96]
+              - cell "15" [ref=e97]
+              - cell "2/3" [ref=e98]
+            - row "#93 1m ago 2 2 4 8.2 MiB 15 2/3" [ref=e99]:
+              - cell [ref=e100]:
+                - checkbox [ref=e101]
+              - cell "#93" [ref=e102]:
+                - link "#93" [ref=e103] [cursor=pointer]:
+                  - /url: /manifests/93
+              - cell "1m ago" [ref=e104]
+              - cell "2" [ref=e105]
+              - cell "2" [ref=e106]
+              - cell "4" [ref=e107]
+              - cell "8.2 MiB" [ref=e108]
+              - cell "15" [ref=e109]
+              - cell "2/3" [ref=e110]
+            - row "#92 1m ago 0 2 2 7.9 MiB 15 2/3" [ref=e111]:
+              - cell [ref=e112]:
+                - checkbox [ref=e113]
+              - cell "#92" [ref=e114]:
+                - link "#92" [ref=e115] [cursor=pointer]:
+                  - /url: /manifests/92
+              - cell "1m ago" [ref=e116]
+              - cell "0" [ref=e117]
+              - cell "2" [ref=e118]
+              - cell "2" [ref=e119]
+              - cell "7.9 MiB" [ref=e120]
+              - cell "15" [ref=e121]
+              - cell "2/3" [ref=e122]
+            - row "#91 1m ago 0 5 5 8.3 MiB 15 2/3" [ref=e123]:
+              - cell [ref=e124]:
+                - checkbox [ref=e125]
+              - cell "#91" [ref=e126]:
+                - link "#91" [ref=e127] [cursor=pointer]:
+                  - /url: /manifests/91
+              - cell "1m ago" [ref=e128]
+              - cell "0" [ref=e129]
+              - cell "5" [ref=e130]
+              - cell "5" [ref=e131]
+              - cell "8.3 MiB" [ref=e132]
+              - cell "15" [ref=e133]
+              - cell "2/3" [ref=e134]
+            - row "#90 1m ago 0 5 5 8.3 MiB 14 2/3" [ref=e135]:
+              - cell [ref=e136]:
+                - checkbox [ref=e137]
+              - cell "#90" [ref=e138]:
+                - link "#90" [ref=e139] [cursor=pointer]:
+                  - /url: /manifests/90
+              - cell "1m ago" [ref=e140]
+              - cell "0" [ref=e141]
+              - cell "5" [ref=e142]
+              - cell "5" [ref=e143]
+              - cell "8.3 MiB" [ref=e144]
+              - cell "14" [ref=e145]
+              - cell "2/3" [ref=e146]
+            - row "#89 1m ago 8 4 12 8.3 MiB 14 2/3" [ref=e147]:
+              - cell [ref=e148]:
+                - checkbox [ref=e149]
+              - cell "#89" [ref=e150]:
+                - link "#89" [ref=e151] [cursor=pointer]:
+                  - /url: /manifests/89
+              - cell "1m ago" [ref=e152]
+              - cell "8" [ref=e153]
+              - cell "4" [ref=e154]
+              - cell "12" [ref=e155]
+              - cell "8.3 MiB" [ref=e156]
+              - cell "14" [ref=e157]
+              - cell "2/3" [ref=e158]
+            - row "#88 1m ago 8 4 12 8.3 MiB 13 2/3" [ref=e159]:
+              - cell [ref=e160]:
+                - checkbox [ref=e161]
+              - cell "#88" [ref=e162]:
+                - link "#88" [ref=e163] [cursor=pointer]:
+                  - /url: /manifests/88
+              - cell "1m ago" [ref=e164]
+              - cell "8" [ref=e165]
+              - cell "4" [ref=e166]
+              - cell "12" [ref=e167]
+              - cell "8.3 MiB" [ref=e168]
+              - cell "13" [ref=e169]
+              - cell "2/3" [ref=e170]
+            - row "#87 1m ago 5 4 9 8.0 MiB 13 2/3" [ref=e171]:
+              - cell [ref=e172]:
+                - checkbox [ref=e173]
+              - cell "#87" [ref=e174]:
+                - link "#87" [ref=e175] [cursor=pointer]:
+                  - /url: /manifests/87
+              - cell "1m ago" [ref=e176]
+              - cell "5" [ref=e177]
+              - cell "4" [ref=e178]
+              - cell "9" [ref=e179]
+              - cell "8.0 MiB" [ref=e180]
+              - cell "13" [ref=e181]
+              - cell "2/3" [ref=e182]
+            - row "#86 1m ago 4 4 8 7.8 MiB 13 2/3" [ref=e183]:
+              - cell [ref=e184]:
+                - checkbox [ref=e185]
+              - cell "#86" [ref=e186]:
+                - link "#86" [ref=e187] [cursor=pointer]:
+                  - /url: /manifests/86
+              - cell "1m ago" [ref=e188]
+              - cell "4" [ref=e189]
+              - cell "4" [ref=e190]
+              - cell "8" [ref=e191]
+              - cell "7.8 MiB" [ref=e192]
+              - cell "13" [ref=e193]
+              - cell "2/3" [ref=e194]
+            - row "#85 1m ago 3 4 7 7.7 MiB 13 2/3" [ref=e195]:
+              - cell [ref=e196]:
+                - checkbox [ref=e197]
+              - cell "#85" [ref=e198]:
+                - link "#85" [ref=e199] [cursor=pointer]:
+                  - /url: /manifests/85
+              - cell "1m ago" [ref=e200]
+              - cell "3" [ref=e201]
+              - cell "4" [ref=e202]
+              - cell "7" [ref=e203]
+              - cell "7.7 MiB" [ref=e204]
+              - cell "13" [ref=e205]
+              - cell "2/3" [ref=e206]
+            - row "#84 2m ago 0 4 4 7.4 MiB 13 2/3" [ref=e207]:
+              - cell [ref=e208]:
+                - checkbox [ref=e209]
+              - cell "#84" [ref=e210]:
+                - link "#84" [ref=e211] [cursor=pointer]:
+                  - /url: /manifests/84
+              - cell "2m ago" [ref=e212]
+              - cell "0" [ref=e213]
+              - cell "4" [ref=e214]
+              - cell "4" [ref=e215]
+              - cell "7.4 MiB" [ref=e216]
+              - cell "13" [ref=e217]
+              - cell "2/3" [ref=e218]
+            - row "#83 2m ago 8 3 11 7.4 MiB 13 2/3" [ref=e219]:
+              - cell [ref=e220]:
+                - checkbox [ref=e221]
+              - cell "#83" [ref=e222]:
+                - link "#83" [ref=e223] [cursor=pointer]:
+                  - /url: /manifests/83
+              - cell "2m ago" [ref=e224]
+              - cell "8" [ref=e225]
+              - cell "3" [ref=e226]
+              - cell "11" [ref=e227]
+              - cell "7.4 MiB" [ref=e228]
+              - cell "13" [ref=e229]
+              - cell "2/3" [ref=e230]
+            - row "#82 2m ago 8 3 11 7.4 MiB 12 2/3" [ref=e231]:
+              - cell [ref=e232]:
+                - checkbox [ref=e233]
+              - cell "#82" [ref=e234]:
+                - link "#82" [ref=e235] [cursor=pointer]:
+                  - /url: /manifests/82
+              - cell "2m ago" [ref=e236]
+              - cell "8" [ref=e237]
+              - cell "3" [ref=e238]
+              - cell "11" [ref=e239]
+              - cell "7.4 MiB" [ref=e240]
+              - cell "12" [ref=e241]
+              - cell "2/3" [ref=e242]
+            - row "#81 2m ago 6 3 9 7.1 MiB 12 2/3" [ref=e243]:
+              - cell [ref=e244]:
+                - checkbox [ref=e245]
+              - cell "#81" [ref=e246]:
+                - link "#81" [ref=e247] [cursor=pointer]:
+                  - /url: /manifests/81
+              - cell "2m ago" [ref=e248]
+              - cell "6" [ref=e249]
+              - cell "3" [ref=e250]
+              - cell "9" [ref=e251]
+              - cell "7.1 MiB" [ref=e252]
+              - cell "12" [ref=e253]
+              - cell "2/3" [ref=e254]
+            - row "#80 2m ago 5 3 8 7.0 MiB 12 2/3" [ref=e255]:
+              - cell [ref=e256]:
+                - checkbox [ref=e257]
+              - cell "#80" [ref=e258]:
+                - link "#80" [ref=e259] [cursor=pointer]:
+                  - /url: /manifests/80
+              - cell "2m ago" [ref=e260]
+              - cell "5" [ref=e261]
+              - cell "3" [ref=e262]
+              - cell "8" [ref=e263]
+              - cell "7.0 MiB" [ref=e264]
+              - cell "12" [ref=e265]
+              - cell "2/3" [ref=e266]
+            - row "#79 2m ago 4 3 7 6.9 MiB 12 2/3" [ref=e267]:
+              - cell [ref=e268]:
+                - checkbox [ref=e269]
+              - cell "#79" [ref=e270]:
+                - link "#79" [ref=e271] [cursor=pointer]:
+                  - /url: /manifests/79
+              - cell "2m ago" [ref=e272]
+              - cell "4" [ref=e273]
+              - cell "3" [ref=e274]
+              - cell "7" [ref=e275]
+              - cell "6.9 MiB" [ref=e276]
+              - cell "12" [ref=e277]
+              - cell "2/3" [ref=e278]
+            - row "#78 2m ago 2 3 5 6.7 MiB 12 2/3" [ref=e279]:
+              - cell [ref=e280]:
+                - checkbox [ref=e281]
+              - cell "#78" [ref=e282]:
+                - link "#78" [ref=e283] [cursor=pointer]:
+                  - /url: /manifests/78
+              - cell "2m ago" [ref=e284]
+              - cell "2" [ref=e285]
+              - cell "3" [ref=e286]
+              - cell "5" [ref=e287]
+              - cell "6.7 MiB" [ref=e288]
+              - cell "12" [ref=e289]
+              - cell "2/3" [ref=e290]
+            - row "#77 2m ago 1 3 4 6.6 MiB 12 2/3" [ref=e291]:
+              - cell [ref=e292]:
+                - checkbox [ref=e293]
+              - cell "#77" [ref=e294]:
+                - link "#77" [ref=e295] [cursor=pointer]:
+                  - /url: /manifests/77
+              - cell "2m ago" [ref=e296]
+              - cell "1" [ref=e297]
+              - cell "3" [ref=e298]
+              - cell "4" [ref=e299]
+              - cell "6.6 MiB" [ref=e300]
+              - cell "12" [ref=e301]
+              - cell "2/3" [ref=e302]
+            - row "#76 2m ago 0 3 3 6.4 MiB 12 2/3" [ref=e303]:
+              - cell [ref=e304]:
+                - checkbox [ref=e305]
+              - cell "#76" [ref=e306]:
+                - link "#76" [ref=e307] [cursor=pointer]:
+                  - /url: /manifests/76
+              - cell "2m ago" [ref=e308]
+              - cell "0" [ref=e309]
+              - cell "3" [ref=e310]
+              - cell "3" [ref=e311]
+              - cell "6.4 MiB" [ref=e312]
+              - cell "12" [ref=e313]
+              - cell "2/3" [ref=e314]
+            - row "#75 2m ago 8 2 10 6.5 MiB 12 2/3" [ref=e315]:
+              - cell [ref=e316]:
+                - checkbox [ref=e317]
+              - cell "#75" [ref=e318]:
+                - link "#75" [ref=e319] [cursor=pointer]:
+                  - /url: /manifests/75
+              - cell "2m ago" [ref=e320]
+              - cell "8" [ref=e321]
+              - cell "2" [ref=e322]
+              - cell "10" [ref=e323]
+              - cell "6.5 MiB" [ref=e324]
+              - cell "12" [ref=e325]
+              - cell "2/3" [ref=e326]
+            - row "#74 2m ago 8 2 10 6.5 MiB 11 2/3" [ref=e327]:
+              - cell [ref=e328]:
+                - checkbox [ref=e329]
+              - cell "#74" [ref=e330]:
+                - link "#74" [ref=e331] [cursor=pointer]:
+                  - /url: /manifests/74
+              - cell "2m ago" [ref=e332]
+              - cell "8" [ref=e333]
+              - cell "2" [ref=e334]
+              - cell "10" [ref=e335]
+              - cell "6.5 MiB" [ref=e336]
+              - cell "11" [ref=e337]
+              - cell "2/3" [ref=e338]
+            - row "#73 2m ago 7 2 9 6.4 MiB 11 2/3" [ref=e339]:
+              - cell [ref=e340]:
+                - checkbox [ref=e341]
+              - cell "#73" [ref=e342]:
+                - link "#73" [ref=e343] [cursor=pointer]:
+                  - /url: /manifests/73
+              - cell "2m ago" [ref=e344]
+              - cell "7" [ref=e345]
+              - cell "2" [ref=e346]
+              - cell "9" [ref=e347]
+              - cell "6.4 MiB" [ref=e348]
+              - cell "11" [ref=e349]
+              - cell "2/3" [ref=e350]
+            - row "#72 2m ago 6 2 8 6.2 MiB 11 2/3" [ref=e351]:
+              - cell [ref=e352]:
+                - checkbox [ref=e353]
+              - cell "#72" [ref=e354]:
+                - link "#72" [ref=e355] [cursor=pointer]:
+                  - /url: /manifests/72
+              - cell "2m ago" [ref=e356]
+              - cell "6" [ref=e357]
+              - cell "2" [ref=e358]
+              - cell "8" [ref=e359]
+              - cell "6.2 MiB" [ref=e360]
+              - cell "11" [ref=e361]
+              - cell "2/3" [ref=e362]
+            - row "#71 2m ago 5 2 7 6.1 MiB 11 2/3" [ref=e363]:
+              - cell [ref=e364]:
+                - checkbox [ref=e365]
+              - cell "#71" [ref=e366]:
+                - link "#71" [ref=e367] [cursor=pointer]:
+                  - /url: /manifests/71
+              - cell "2m ago" [ref=e368]
+              - cell "5" [ref=e369]
+              - cell "2" [ref=e370]
+              - cell "7" [ref=e371]
+              - cell "6.1 MiB" [ref=e372]
+              - cell "11" [ref=e373]
+              - cell "2/3" [ref=e374]
+            - row "#70 2m ago 4 2 6 6.0 MiB 11 2/3" [ref=e375]:
+              - cell [ref=e376]:
+                - checkbox [ref=e377]
+              - cell "#70" [ref=e378]:
+                - link "#70" [ref=e379] [cursor=pointer]:
+                  - /url: /manifests/70
+              - cell "2m ago" [ref=e380]
+              - cell "4" [ref=e381]
+              - cell "2" [ref=e382]
+              - cell "6" [ref=e383]
+              - cell "6.0 MiB" [ref=e384]
+              - cell "11" [ref=e385]
+              - cell "2/3" [ref=e386]
+            - row "#69 2m ago 3 2 5 5.9 MiB 11 2/3" [ref=e387]:
+              - cell [ref=e388]:
+                - checkbox [ref=e389]
+              - cell "#69" [ref=e390]:
+                - link "#69" [ref=e391] [cursor=pointer]:
+                  - /url: /manifests/69
+              - cell "2m ago" [ref=e392]
+              - cell "3" [ref=e393]
+              - cell "2" [ref=e394]
+              - cell "5" [ref=e395]
+              - cell "5.9 MiB" [ref=e396]
+              - cell "11" [ref=e397]
+              - cell "2/3" [ref=e398]
+            - row "#68 2m ago 2 2 4 5.8 MiB 11 2/3" [ref=e399]:
+              - cell [ref=e400]:
+                - checkbox [ref=e401]
+              - cell "#68" [ref=e402]:
+                - link "#68" [ref=e403] [cursor=pointer]:
+                  - /url: /manifests/68
+              - cell "2m ago" [ref=e404]
+              - cell "2" [ref=e405]
+              - cell "2" [ref=e406]
+              - cell "4" [ref=e407]
+              - cell "5.8 MiB" [ref=e408]
+              - cell "11" [ref=e409]
+              - cell "2/3" [ref=e410]
+            - row "#67 2m ago 1 2 3 5.6 MiB 11 2/3" [ref=e411]:
+              - cell [ref=e412]:
+                - checkbox [ref=e413]
+              - cell "#67" [ref=e414]:
+                - link "#67" [ref=e415] [cursor=pointer]:
+                  - /url: /manifests/67
+              - cell "2m ago" [ref=e416]
+              - cell "1" [ref=e417]
+              - cell "2" [ref=e418]
+              - cell "3" [ref=e419]
+              - cell "5.6 MiB" [ref=e420]
+              - cell "11" [ref=e421]
+              - cell "2/3" [ref=e422]
+            - row "#66 2m ago 0 2 2 5.5 MiB 11 2/3" [ref=e423]:
+              - cell [ref=e424]:
+                - checkbox [ref=e425]
+              - cell "#66" [ref=e426]:
+                - link "#66" [ref=e427] [cursor=pointer]:
+                  - /url: /manifests/66
+              - cell "2m ago" [ref=e428]
+              - cell "0" [ref=e429]
+              - cell "2" [ref=e430]
+              - cell "2" [ref=e431]
+              - cell "5.5 MiB" [ref=e432]
+              - cell "11" [ref=e433]
+              - cell "2/3" [ref=e434]
+            - row "#65 2m ago 0 2 2 5.5 MiB 11 2/2" [ref=e435]:
+              - cell [ref=e436]:
+                - checkbox [ref=e437]
+              - cell "#65" [ref=e438]:
+                - link "#65" [ref=e439] [cursor=pointer]:
+                  - /url: /manifests/65
+              - cell "2m ago" [ref=e440]
+              - cell "0" [ref=e441]
+              - cell "2" [ref=e442]
+              - cell "2" [ref=e443]
+              - cell "5.5 MiB" [ref=e444]
+              - cell "11" [ref=e445]
+              - cell "2/2" [ref=e446]
+            - row "#64 2m ago 0 2 2 5.5 MiB 11 1/2" [ref=e447]:
+              - cell [ref=e448]:
+                - checkbox [ref=e449]
+              - cell "#64" [ref=e450]:
+                - link "#64" [ref=e451] [cursor=pointer]:
+                  - /url: /manifests/64
+              - cell "2m ago" [ref=e452]
+              - cell "0" [ref=e453]
+              - cell "2" [ref=e454]
+              - cell "2" [ref=e455]
+              - cell "5.5 MiB" [ref=e456]
+              - cell "11" [ref=e457]
+              - cell "1/2" [ref=e458]
+            - row "#63 2m ago 0 5 5 6.5 MiB 11 1/2" [ref=e459]:
+              - cell [ref=e460]:
+                - checkbox [ref=e461]
+              - cell "#63" [ref=e462]:
+                - link "#63" [ref=e463] [cursor=pointer]:
+                  - /url: /manifests/63
+              - cell "2m ago" [ref=e464]
+              - cell "0" [ref=e465]
+              - cell "5" [ref=e466]
+              - cell "5" [ref=e467]
+              - cell "6.5 MiB" [ref=e468]
+              - cell "11" [ref=e469]
+              - cell "1/2" [ref=e470]
+            - row "#62 2m ago 0 5 5 6.5 MiB 10 1/2" [ref=e471]:
+              - cell [ref=e472]:
+                - checkbox [ref=e473]
+              - cell "#62" [ref=e474]:
+                - link "#62" [ref=e475] [cursor=pointer]:
+                  - /url: /manifests/62
+              - cell "2m ago" [ref=e476]
+              - cell "0" [ref=e477]
+              - cell "5" [ref=e478]
+              - cell "5" [ref=e479]
+              - cell "6.5 MiB" [ref=e480]
+              - cell "10" [ref=e481]
+              - cell "1/2" [ref=e482]
+            - row "#61 2m ago 5 4 9 6.5 MiB 10 1/2" [ref=e483]:
+              - cell [ref=e484]:
+                - checkbox [ref=e485]
+              - cell "#61" [ref=e486]:
+                - link "#61" [ref=e487] [cursor=pointer]:
+                  - /url: /manifests/61
+              - cell "2m ago" [ref=e488]
+              - cell "5" [ref=e489]
+              - cell "4" [ref=e490]
+              - cell "9" [ref=e491]
+              - cell "6.5 MiB" [ref=e492]
+              - cell "10" [ref=e493]
+              - cell "1/2" [ref=e494]
+            - row "#60 2m ago 5 4 9 6.5 MiB 9 1/2" [ref=e495]:
+              - cell [ref=e496]:
+                - checkbox [ref=e497]
+              - cell "#60" [ref=e498]:
+                - link "#60" [ref=e499] [cursor=pointer]:
+                  - /url: /manifests/60
+              - cell "2m ago" [ref=e500]
+              - cell "5" [ref=e501]
+              - cell "4" [ref=e502]
+              - cell "9" [ref=e503]
+              - cell "6.5 MiB" [ref=e504]
+              - cell "9" [ref=e505]
+              - cell "1/2" [ref=e506]
+            - row "#59 2m ago 5 4 9 6.5 MiB 9 1/1" [ref=e507]:
+              - cell [ref=e508]:
+                - checkbox [ref=e509]
+              - cell "#59" [ref=e510]:
+                - link "#59" [ref=e511] [cursor=pointer]:
+                  - /url: /manifests/59
+              - cell "2m ago" [ref=e512]
+              - cell "5" [ref=e513]
+              - cell "4" [ref=e514]
+              - cell "9" [ref=e515]
+              - cell "6.5 MiB" [ref=e516]
+              - cell "9" [ref=e517]
+              - cell "1/1" [ref=e518]
+            - row "#58 2m ago 5 4 9 6.5 MiB 8 1/1" [ref=e519]:
+              - cell [ref=e520]:
+                - checkbox [ref=e521]
+              - cell "#58" [ref=e522]:
+                - link "#58" [ref=e523] [cursor=pointer]:
+                  - /url: /manifests/58
+              - cell "2m ago" [ref=e524]
+              - cell "5" [ref=e525]
+              - cell "4" [ref=e526]
+              - cell "9" [ref=e527]
+              - cell "6.5 MiB" [ref=e528]
+              - cell "8" [ref=e529]
+              - cell "1/1" [ref=e530]
+            - row "#57 2m ago 5 4 9 6.5 MiB 8 1/1" [ref=e531]:
+              - cell [ref=e532]:
+                - checkbox [ref=e533]
+              - cell "#57" [ref=e534]:
+                - link "#57" [ref=e535] [cursor=pointer]:
+                  - /url: /manifests/57
+              - cell "2m ago" [ref=e536]
+              - cell "5" [ref=e537]
+              - cell "4" [ref=e538]
+              - cell "9" [ref=e539]
+              - cell "6.5 MiB" [ref=e540]
+              - cell "8" [ref=e541]
+              - cell "1/1" [ref=e542]
+            - row "#56 2m ago 4 4 8 6.5 MiB 8 1/1" [ref=e543]:
+              - cell [ref=e544]:
+                - checkbox [ref=e545]
+              - cell "#56" [ref=e546]:
+                - link "#56" [ref=e547] [cursor=pointer]:
+                  - /url: /manifests/56
+              - cell "2m ago" [ref=e548]
+              - cell "4" [ref=e549]
+              - cell "4" [ref=e550]
+              - cell "8" [ref=e551]
+              - cell "6.5 MiB" [ref=e552]
+              - cell "8" [ref=e553]
+              - cell "1/1" [ref=e554]
+            - row "#55 2m ago 3 4 7 6.3 MiB 8 1/1" [ref=e555]:
+              - cell [ref=e556]:
+                - checkbox [ref=e557]
+              - cell "#55" [ref=e558]:
+                - link "#55" [ref=e559] [cursor=pointer]:
+                  - /url: /manifests/55
+              - cell "2m ago" [ref=e560]
+              - cell "3" [ref=e561]
+              - cell "4" [ref=e562]
+              - cell "7" [ref=e563]
+              - cell "6.3 MiB" [ref=e564]
+              - cell "8" [ref=e565]
+              - cell "1/1" [ref=e566]
+            - row "#54 2m ago 0 4 4 6.0 MiB 8 1/1" [ref=e567]:
+              - cell [ref=e568]:
+                - checkbox [ref=e569]
+              - cell "#54" [ref=e570]:
+                - link "#54" [ref=e571] [cursor=pointer]:
+                  - /url: /manifests/54
+              - cell "2m ago" [ref=e572]
+              - cell "0" [ref=e573]
+              - cell "4" [ref=e574]
+              - cell "4" [ref=e575]
+              - cell "6.0 MiB" [ref=e576]
+              - cell "8" [ref=e577]
+              - cell "1/1" [ref=e578]
+            - row "#53 2m ago 8 3 11 6.0 MiB 8 1/1" [ref=e579]:
+              - cell [ref=e580]:
+                - checkbox [ref=e581]
+              - cell "#53" [ref=e582]:
+                - link "#53" [ref=e583] [cursor=pointer]:
+                  - /url: /manifests/53
+              - cell "2m ago" [ref=e584]
+              - cell "8" [ref=e585]
+              - cell "3" [ref=e586]
+              - cell "11" [ref=e587]
+              - cell "6.0 MiB" [ref=e588]
+              - cell "8" [ref=e589]
+              - cell "1/1" [ref=e590]
+            - row "#52 2m ago 8 3 11 6.0 MiB 7 1/1" [ref=e591]:
+              - cell [ref=e592]:
+                - checkbox [ref=e593]
+              - cell "#52" [ref=e594]:
+                - link "#52" [ref=e595] [cursor=pointer]:
+                  - /url: /manifests/52
+              - cell "2m ago" [ref=e596]
+              - cell "8" [ref=e597]
+              - cell "3" [ref=e598]
+              - cell "11" [ref=e599]
+              - cell "6.0 MiB" [ref=e600]
+              - cell "7" [ref=e601]
+              - cell "1/1" [ref=e602]
+            - row "#51 2m ago 5 3 8 5.7 MiB 7 1/1" [ref=e603]:
+              - cell [ref=e604]:
+                - checkbox [ref=e605]
+              - cell "#51" [ref=e606]:
+                - link "#51" [ref=e607] [cursor=pointer]:
+                  - /url: /manifests/51
+              - cell "2m ago" [ref=e608]
+              - cell "5" [ref=e609]
+              - cell "3" [ref=e610]
+              - cell "8" [ref=e611]
+              - cell "5.7 MiB" [ref=e612]
+              - cell "7" [ref=e613]
+              - cell "1/1" [ref=e614]
+            - row "#50 2m ago 4 3 7 5.5 MiB 7 1/1" [ref=e615]:
+              - cell [ref=e616]:
+                - checkbox [ref=e617]
+              - cell "#50" [ref=e618]:
+                - link "#50" [ref=e619] [cursor=pointer]:
+                  - /url: /manifests/50
+              - cell "2m ago" [ref=e620]
+              - cell "4" [ref=e621]
+              - cell "3" [ref=e622]
+              - cell "7" [ref=e623]
+              - cell "5.5 MiB" [ref=e624]
+              - cell "7" [ref=e625]
+              - cell "1/1" [ref=e626]
+            - row "#49 2m ago 1 3 4 5.2 MiB 7 1/1" [ref=e627]:
+              - cell [ref=e628]:
+                - checkbox [ref=e629]
+              - cell "#49" [ref=e630]:
+                - link "#49" [ref=e631] [cursor=pointer]:
+                  - /url: /manifests/49
+              - cell "2m ago" [ref=e632]
+              - cell "1" [ref=e633]
+              - cell "3" [ref=e634]
+              - cell "4" [ref=e635]
+              - cell "5.2 MiB" [ref=e636]
+              - cell "7" [ref=e637]
+              - cell "1/1" [ref=e638]
+        - paragraph [ref=e639]: Newest first. Pick two versions to diff them.

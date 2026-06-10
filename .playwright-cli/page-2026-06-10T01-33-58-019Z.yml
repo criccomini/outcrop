@@ -1,0 +1,167 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "SlateDB Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "SlateDB" [ref=e7]
+        - generic [ref=e8]: Dashboard
+      - navigation [ref=e9]:
+        - link "Overview" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "LSM Tree" [ref=e11] [cursor=pointer]:
+          - /url: /lsm
+        - link "Manifests" [ref=e12] [cursor=pointer]:
+          - /url: /manifests
+        - link "Compactions" [ref=e13] [cursor=pointer]:
+          - /url: /compactions
+        - link "Checkpoints" [ref=e14] [cursor=pointer]:
+          - /url: /checkpoints
+      - generic [ref=e15]:
+        - generic [ref=e16]: local://demo-db
+        - generic [ref=e17]: read-only
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - heading "Checkpoints" [level=1] [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Checkpoints (16)" [level=3] [ref=e24]
+          - table [ref=e26]:
+            - rowgroup [ref=e27]:
+              - row "Name Manifest Created Expires ID" [ref=e28]:
+                - columnheader "Name" [ref=e29]
+                - columnheader "Manifest" [ref=e30]
+                - columnheader "Created" [ref=e31]
+                - columnheader "Expires" [ref=e32]
+                - columnheader "ID" [ref=e33]
+            - rowgroup [ref=e34]:
+              - 'row "— #12 3m ago in 12m 70423c7f-1b51-4505-a672-53dc45377961" [ref=e35]':
+                - cell "—" [ref=e36]
+                - cell "#12" [ref=e37]:
+                  - link "#12" [ref=e38] [cursor=pointer]:
+                    - /url: /manifests/12
+                - cell "3m ago" [ref=e39]
+                - cell "in 12m" [ref=e40]
+                - cell "70423c7f-1b51-4505-a672-53dc45377961" [ref=e41]
+              - 'row "— #20 3m ago in 12m aa0f5c77-bf64-442a-94e5-8722c1db51d7" [ref=e42]':
+                - cell "—" [ref=e43]
+                - cell "#20" [ref=e44]:
+                  - link "#20" [ref=e45] [cursor=pointer]:
+                    - /url: /manifests/20
+                - cell "3m ago" [ref=e46]
+                - cell "in 12m" [ref=e47]
+                - cell "aa0f5c77-bf64-442a-94e5-8722c1db51d7" [ref=e48]
+              - 'row "— #26 3m ago in 12m 37725d73-cbe3-40ab-8cc4-3c3419453767" [ref=e49]':
+                - cell "—" [ref=e50]
+                - cell "#26" [ref=e51]:
+                  - link "#26" [ref=e52] [cursor=pointer]:
+                    - /url: /manifests/26
+                - cell "3m ago" [ref=e53]
+                - cell "in 12m" [ref=e54]
+                - cell "37725d73-cbe3-40ab-8cc4-3c3419453767" [ref=e55]
+              - 'row "— #33 3m ago in 12m de12d5f6-af2f-43f3-b642-442f5f49119a" [ref=e56]':
+                - cell "—" [ref=e57]
+                - cell "#33" [ref=e58]:
+                  - link "#33" [ref=e59] [cursor=pointer]:
+                    - /url: /manifests/33
+                - cell "3m ago" [ref=e60]
+                - cell "in 12m" [ref=e61]
+                - cell "de12d5f6-af2f-43f3-b642-442f5f49119a" [ref=e62]
+              - 'row "— #39 3m ago in 12m 41f18275-06ad-41a2-952a-750a079a83cc" [ref=e63]':
+                - cell "—" [ref=e64]
+                - cell "#39" [ref=e65]:
+                  - link "#39" [ref=e66] [cursor=pointer]:
+                    - /url: /manifests/39
+                - cell "3m ago" [ref=e67]
+                - cell "in 12m" [ref=e68]
+                - cell "41f18275-06ad-41a2-952a-750a079a83cc" [ref=e69]
+              - 'row "— #41 3m ago in 12m 023a5ecd-2aab-4edf-b0a2-bd91584fdc80" [ref=e70]':
+                - cell "—" [ref=e71]
+                - cell "#41" [ref=e72]:
+                  - link "#41" [ref=e73] [cursor=pointer]:
+                    - /url: /manifests/41
+                - cell "3m ago" [ref=e74]
+                - cell "in 12m" [ref=e75]
+                - cell "023a5ecd-2aab-4edf-b0a2-bd91584fdc80" [ref=e76]
+              - 'row "— #47 3m ago in 12m dada0663-821b-4e68-b0da-b785cb1ef933" [ref=e77]':
+                - cell "—" [ref=e78]
+                - cell "#47" [ref=e79]:
+                  - link "#47" [ref=e80] [cursor=pointer]:
+                    - /url: /manifests/47
+                - cell "3m ago" [ref=e81]
+                - cell "in 12m" [ref=e82]
+                - cell "dada0663-821b-4e68-b0da-b785cb1ef933" [ref=e83]
+              - 'row "— #53 2m ago in 13m f17d0784-de82-42ca-9a91-1b18d1aa2b0d" [ref=e84]':
+                - cell "—" [ref=e85]
+                - cell "#53" [ref=e86]:
+                  - link "#53" [ref=e87] [cursor=pointer]:
+                    - /url: /manifests/53
+                - cell "2m ago" [ref=e88]
+                - cell "in 13m" [ref=e89]
+                - cell "f17d0784-de82-42ca-9a91-1b18d1aa2b0d" [ref=e90]
+              - 'row "demo-midway #59 2m ago in 7d a50512dc-eed6-4d72-9124-d1e40e2900a5" [ref=e91]':
+                - cell "demo-midway" [ref=e92]
+                - cell "#59" [ref=e93]:
+                  - link "#59" [ref=e94] [cursor=pointer]:
+                    - /url: /manifests/59
+                - cell "2m ago" [ref=e95]
+                - cell "in 7d" [ref=e96]
+                - cell "a50512dc-eed6-4d72-9124-d1e40e2900a5" [ref=e97]
+              - 'row "— #61 2m ago in 13m 08a57afc-6f1d-43ac-8af2-ebf5d4f09c5a" [ref=e98]':
+                - cell "—" [ref=e99]
+                - cell "#61" [ref=e100]:
+                  - link "#61" [ref=e101] [cursor=pointer]:
+                    - /url: /manifests/61
+                - cell "2m ago" [ref=e102]
+                - cell "in 13m" [ref=e103]
+                - cell "08a57afc-6f1d-43ac-8af2-ebf5d4f09c5a" [ref=e104]
+              - 'row "— #63 2m ago in 13m 11c87c19-a92d-4002-ac6d-ab646203fbe2" [ref=e105]':
+                - cell "—" [ref=e106]
+                - cell "#63" [ref=e107]:
+                  - link "#63" [ref=e108] [cursor=pointer]:
+                    - /url: /manifests/63
+                - cell "2m ago" [ref=e109]
+                - cell "in 13m" [ref=e110]
+                - cell "11c87c19-a92d-4002-ac6d-ab646203fbe2" [ref=e111]
+              - 'row "— #75 2m ago in 13m 932c84eb-74b1-48b9-b7a2-49b44a4df49d" [ref=e112]':
+                - cell "—" [ref=e113]
+                - cell "#75" [ref=e114]:
+                  - link "#75" [ref=e115] [cursor=pointer]:
+                    - /url: /manifests/75
+                - cell "2m ago" [ref=e116]
+                - cell "in 13m" [ref=e117]
+                - cell "932c84eb-74b1-48b9-b7a2-49b44a4df49d" [ref=e118]
+              - 'row "— #83 2m ago in 13m 20c79708-5b89-4abd-bd2c-c26dbd2af356" [ref=e119]':
+                - cell "—" [ref=e120]
+                - cell "#83" [ref=e121]:
+                  - link "#83" [ref=e122] [cursor=pointer]:
+                    - /url: /manifests/83
+                - cell "2m ago" [ref=e123]
+                - cell "in 13m" [ref=e124]
+                - cell "20c79708-5b89-4abd-bd2c-c26dbd2af356" [ref=e125]
+              - 'row "— #89 2m ago in 13m a88d49ab-4b0a-442b-88de-540d97345051" [ref=e126]':
+                - cell "—" [ref=e127]
+                - cell "#89" [ref=e128]:
+                  - link "#89" [ref=e129] [cursor=pointer]:
+                    - /url: /manifests/89
+                - cell "2m ago" [ref=e130]
+                - cell "in 13m" [ref=e131]
+                - cell "a88d49ab-4b0a-442b-88de-540d97345051" [ref=e132]
+              - 'row "— #91 2m ago in 13m 0814b835-792b-490e-981f-cae42b15ef85" [ref=e133]':
+                - cell "—" [ref=e134]
+                - cell "#91" [ref=e135]:
+                  - link "#91" [ref=e136] [cursor=pointer]:
+                    - /url: /manifests/91
+                - cell "2m ago" [ref=e137]
+                - cell "in 13m" [ref=e138]
+                - cell "0814b835-792b-490e-981f-cae42b15ef85" [ref=e139]
+              - 'row "demo-final #98 2m ago never 9485a970-7510-4293-b85b-b0e4f522b7de" [ref=e140]':
+                - cell "demo-final" [ref=e141]
+                - cell "#98" [ref=e142]:
+                  - link "#98" [ref=e143] [cursor=pointer]:
+                    - /url: /manifests/98
+                - cell "2m ago" [ref=e144]
+                - cell "never" [ref=e145]
+                - cell "9485a970-7510-4293-b85b-b0e4f522b7de" [ref=e146]
+        - generic [ref=e147]:
+          - heading "Clone parents (0)" [level=3] [ref=e149]
+          - generic [ref=e150]: This DB was not cloned from another DB.

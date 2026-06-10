@@ -1,0 +1,63 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "SlateDB Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "SlateDB" [ref=e7]
+        - generic [ref=e8]: Dashboard
+      - navigation [ref=e9]:
+        - link "Overview" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "LSM Tree" [ref=e11] [cursor=pointer]:
+          - /url: /lsm
+        - link "Manifests" [ref=e12] [cursor=pointer]:
+          - /url: /manifests
+        - link "Compactions" [ref=e13] [cursor=pointer]:
+          - /url: /compactions
+        - link "Checkpoints" [ref=e14] [cursor=pointer]:
+          - /url: /checkpoints
+      - generic [ref=e15]:
+        - generic [ref=e16]: local://demo-db
+        - generic [ref=e17]: read-only
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - heading "Overview" [level=1] [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: local://demo-db
+          - generic [ref=e24]: manifest updated 2s ago
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: Total size
+            - generic [ref=e28]: 4.9 MiB
+            - generic [ref=e29]: "L0: 243 KiB"
+          - generic [ref=e30]:
+            - generic [ref=e31]: SSTs
+            - generic [ref=e32]: "5"
+            - generic [ref=e33]: 2 in L0 · 3 sorted runs
+          - generic [ref=e34]:
+            - generic [ref=e35]: Manifest
+            - link "#92" [ref=e37] [cursor=pointer]:
+              - /url: /manifests/92
+            - generic [ref=e38]: "23 versions retained (oldest #49)"
+          - generic [ref=e39]:
+            - generic [ref=e40]: Last L0 write
+            - generic [ref=e41]: 2m ago
+            - generic [ref=e42]: 6/9/2026, 6:24:44 PM · seq 19,845
+          - generic [ref=e43]:
+            - generic [ref=e44]: WAL window
+            - generic [ref=e45]: "1"
+            - generic [ref=e46]: "replay after #19845 · next #19847"
+          - generic [ref=e47]:
+            - generic [ref=e48]: Epochs
+            - generic [ref=e49]: w1 / c1
+            - generic [ref=e50]: writer / compactor
+          - generic [ref=e51]:
+            - generic [ref=e52]: Checkpoints
+            - link "7" [ref=e54] [cursor=pointer]:
+              - /url: /checkpoints
+            - generic [ref=e55]: no clone parents
+          - generic [ref=e56]:
+            - generic [ref=e57]: Segments
+            - generic [ref=e58]: —
+            - generic [ref=e59]: single object store

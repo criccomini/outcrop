@@ -1,0 +1,124 @@
+import { useQuery } from '@tanstack/react-query'
+import type {
+  CheckpointStatusDto,
+  CompactorStateDto,
+  ExternalDbDto,
+  HealthDto,
+  LsmDto,
+  ManifestDiffDto,
+  ManifestDto,
+  ManifestSummaryDto,
+  OverviewDto,
+  SstDetailDto,
+  VersionedCompactionsDto,
+} from './types'
+
+export class ApiRequestError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    let message = `${res.status} ${res.statusText}`
+    try {
+      const body = await res.json()
+      if (body.error) message = body.error
+    } catch {
+      // not JSON; keep the status line
+    }
+    throw new ApiRequestError(res.status, message)
+  }
+  return res.json()
+}
+
+/** Poll interval for pages that track live DB state. */
+export const LIVE_REFETCH_MS = 10_000
+
+export function useHealth() {
+  return useQuery<HealthDto, ApiRequestError>({
+    queryKey: ['health'],
+    queryFn: () => fetchJson('/api/health'),
+  })
+}
+
+export function useOverview() {
+  return useQuery<OverviewDto, ApiRequestError>({
+    queryKey: ['overview'],
+    queryFn: () => fetchJson('/api/overview'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useLsm() {
+  return useQuery<LsmDto, ApiRequestError>({
+    queryKey: ['lsm'],
+    queryFn: () => fetchJson('/api/lsm'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useManifests(limit = 50) {
+  return useQuery<ManifestSummaryDto[], ApiRequestError>({
+    queryKey: ['manifests', limit],
+    queryFn: () => fetchJson(`/api/manifests?limit=${limit}`),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useManifest(id: string) {
+  return useQuery<ManifestDto, ApiRequestError>({
+    queryKey: ['manifest', id],
+    queryFn: () => fetchJson(`/api/manifests/${id}`),
+  })
+}
+
+export function useManifestDiff(a: number, b: number) {
+  return useQuery<ManifestDiffDto, ApiRequestError>({
+    queryKey: ['manifest-diff', a, b],
+    queryFn: () => fetchJson(`/api/manifests/diff?a=${a}&b=${b}`),
+  })
+}
+
+export function useSst(ulid: string | null) {
+  return useQuery<SstDetailDto, ApiRequestError>({
+    queryKey: ['sst', ulid],
+    queryFn: () => fetchJson(`/api/ssts/${ulid}`),
+    enabled: ulid !== null,
+  })
+}
+
+export function useCompactorState() {
+  return useQuery<CompactorStateDto, ApiRequestError>({
+    queryKey: ['compactor-state'],
+    queryFn: () => fetchJson('/api/compactor/state'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useCompactions(limit = 20) {
+  return useQuery<VersionedCompactionsDto[], ApiRequestError>({
+    queryKey: ['compactions', limit],
+    queryFn: () => fetchJson(`/api/compactions?limit=${limit}`),
+  })
+}
+
+export function useCheckpoints() {
+  return useQuery<CheckpointStatusDto[], ApiRequestError>({
+    queryKey: ['checkpoints'],
+    queryFn: () => fetchJson('/api/checkpoints'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useClones() {
+  return useQuery<ExternalDbDto[], ApiRequestError>({
+    queryKey: ['clones'],
+    queryFn: () => fetchJson('/api/clones'),
+  })
+}

@@ -1,0 +1,83 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "SlateDB Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "SlateDB" [ref=e7]
+        - generic [ref=e8]: Dashboard
+      - navigation [ref=e9]:
+        - link "Overview" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "LSM Tree" [ref=e11] [cursor=pointer]:
+          - /url: /lsm
+        - link "Manifests" [ref=e12] [cursor=pointer]:
+          - /url: /manifests
+        - link "Compactions" [ref=e13] [cursor=pointer]:
+          - /url: /compactions
+        - link "Checkpoints" [ref=e14] [cursor=pointer]:
+          - /url: /checkpoints
+      - generic [ref=e15]:
+        - generic [ref=e16]: local://demo-db
+        - generic [ref=e17]: read-only
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - 'heading "Diff #89 → #92" [level=1] [ref=e21]':
+          - text: Diff
+          - link "#89" [ref=e22] [cursor=pointer]:
+            - /url: /manifests/89
+          - text: →
+          - link "#92" [ref=e23] [cursor=pointer]:
+            - /url: /manifests/92
+        - link "← all manifests" [ref=e24] [cursor=pointer]:
+          - /url: /manifests
+      - generic [ref=e25]:
+        - generic [ref=e26]: "8 L0 SSTs removed; runs removed: SR 5, SR 6; 1 run changed; 1 checkpoint added"
+        - generic [ref=e27]:
+          - heading "L0" [level=3] [ref=e29]
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: Added
+              - text: none
+            - generic [ref=e34]:
+              - generic [ref=e35]: Removed
+              - generic [ref=e36]:
+                - generic "01KTQJGF4EMKXMJSCGNB8FP83M" [ref=e37]: user:00000082…user:00035721122 KiB
+                - generic "01KTQJGF4EP3CPAPRK1KRYXZXT" [ref=e38]: user:00000107…user:00035914121 KiB
+                - generic "01KTQJGF4E7D3NW6N4A9CMNHWY" [ref=e39]: user:00000027…user:00035998122 KiB
+                - generic "01KTQJGF4D2CC40FJY1J5XHR9M" [ref=e40]: user:00000023…user:00035943123 KiB
+                - generic "01KTQJGF46RWP261VV5TWH7F3W" [ref=e41]: user:00000146…user:00035554123 KiB
+                - generic "01KTQJGF46NND7BZFWK666HKYX" [ref=e42]: user:00000025…user:00035980123 KiB
+                - generic "01KTQJGF46R8H7WZWHA1YJGDW4" [ref=e43]: user:00000024…user:00035935123 KiB
+                - generic "01KTQJGF46TX3CFYXHQWKC5YB4" [ref=e44]: user:00000026…user:00035994122 KiB
+        - generic [ref=e45]:
+          - heading "Sorted runs" [level=3] [ref=e47]
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: − SR 5
+              - generic [ref=e52]: 1 SSTs · 936 KiB
+            - generic [ref=e53]:
+              - generic [ref=e54]: − SR 6
+              - generic [ref=e55]: 1 SSTs · 939 KiB
+            - generic [ref=e56]:
+              - generic [ref=e57]: SR 4 changed
+              - generic "01KTQJGK2H5WPGKTNYP3MKX6TP" [ref=e59]: user:00000003…user:000359993.0 MiB
+              - generic "01KTQJFTJ6KA9HDVKZTHWK1S5J" [ref=e61]: user:00000004…user:00035987552 KiB
+        - generic [ref=e62]:
+          - heading "Checkpoints" [level=3] [ref=e64]
+          - generic [ref=e67]:
+            - generic [ref=e68]: + 0814b835-792b-490e-981f-cae42b15ef85
+            - generic [ref=e69]: "→ manifest #91"
+        - generic [ref=e70]:
+          - heading "Scalar fields" [level=3] [ref=e72]
+          - table [ref=e74]:
+            - rowgroup [ref=e75]:
+              - 'row "Field #89 #92" [ref=e76]':
+                - columnheader "Field" [ref=e77]
+                - columnheader "#89" [ref=e78]
+                - columnheader "#92" [ref=e79]
+            - rowgroup [ref=e80]:
+              - row "last_compacted_l0_sst_view_id 01KTQJGA7QGGR3AWNB93TEEADP 01KTQJGF4EMKXMJSCGNB8FP83M" [ref=e81]:
+                - cell "last_compacted_l0_sst_view_id" [ref=e82]
+                - cell "01KTQJGA7QGGR3AWNB93TEEADP" [ref=e83]
+                - cell "01KTQJGF4EMKXMJSCGNB8FP83M" [ref=e84]

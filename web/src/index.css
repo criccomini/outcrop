@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+
+/* SlateDB website design tokens: slate ink on cool off-white, Marcellus
+   headlines, terracotta accent. */
+@theme {
+  --color-ink-1: #0f1620;
+  --color-ink-2: #1f2a37;
+  --color-ink-3: #3d4856;
+  --color-ink-4: #5e6878;
+  --color-ink-5: #8b94a3;
+  --color-ink-6: #c8cdd5;
+  --color-ink-7: #dfe2e8;
+
+  --color-surface-0: #f6f7f9;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #eef0f3;
+  --color-surface-3: #e2e6eb;
+
+  --color-accent-high: #7a3e22;
+  --color-accent: #b26844;
+  --color-accent-low: #f3e3d8;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Marcellus', ui-serif, Georgia, Cambria, 'Times New Roman',
+    Times, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo,
+    Consolas, 'Liberation Mono', monospace;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 20px 40px rgba(15, 23, 42, 0.09);
+}
+
+body {
+  @apply bg-surface-0 text-ink-2 font-sans antialiased;
+  line-height: 1.7;
+}
+
+h1,
+h2,
+h3 {
+  @apply font-serif text-ink-1;
+  line-height: 1.2;
+}

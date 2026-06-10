@@ -1,0 +1,130 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "SlateDB Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "SlateDB" [ref=e7]
+        - generic [ref=e8]: Dashboard
+      - navigation [ref=e9]:
+        - link "Overview" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "LSM Tree" [ref=e11] [cursor=pointer]:
+          - /url: /lsm
+        - link "Manifests" [ref=e12] [cursor=pointer]:
+          - /url: /manifests
+        - link "Compactions" [ref=e13] [cursor=pointer]:
+          - /url: /compactions
+        - link "Checkpoints" [ref=e14] [cursor=pointer]:
+          - /url: /checkpoints
+      - generic [ref=e15]:
+        - generic [ref=e16]: local://demo-db
+        - generic [ref=e17]: read-only
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - heading "Compactions" [level=1] [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - heading "Current state" [level=3] [ref=e24]
+            - generic [ref=e25]: "manifest #98 · compactions v49 · epoch 3"
+          - table [ref=e27]:
+            - rowgroup [ref=e28]:
+              - row "Status Spec Segment Processed Outputs ID" [ref=e29]:
+                - columnheader "Status" [ref=e30]
+                - columnheader "Spec" [ref=e31]
+                - columnheader "Segment" [ref=e32]
+                - columnheader "Processed" [ref=e33]
+                - columnheader "Outputs" [ref=e34]
+                - columnheader "ID" [ref=e35]
+            - rowgroup [ref=e36]:
+              - row "completed [SR 7, SR 6, SR 5, SR 4] → SR 4 — 0 B — 01KTQJGK27XEDQRGPC9728ANMD" [ref=e37]:
+                - cell "completed" [ref=e38]:
+                  - generic [ref=e39]: completed
+                - cell "[SR 7, SR 6, SR 5, SR 4] → SR 4" [ref=e40]
+                - cell "—" [ref=e41]
+                - cell "0 B" [ref=e42]
+                - cell "—" [ref=e43]
+                - cell "01KTQJGK27XEDQRGPC9728ANMD" [ref=e44]
+        - generic [ref=e45]:
+          - heading "History" [level=3] [ref=e47]
+          - generic [ref=e49]:
+            - group [ref=e50]:
+              - generic "v49epoch 3 · 1 recent compaction · 0 active" [ref=e51] [cursor=pointer]:
+                - generic [ref=e52]: v49
+                - generic [ref=e53]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e54]:
+              - generic "v48epoch 3 · 2 recent compactions · 1 active" [ref=e55] [cursor=pointer]:
+                - generic [ref=e56]: v48
+                - generic [ref=e57]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e58]:
+              - generic "v47epoch 3 · 2 recent compactions · 1 active" [ref=e59] [cursor=pointer]:
+                - generic [ref=e60]: v47
+                - generic [ref=e61]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e62]:
+              - generic "v46epoch 3 · 1 recent compaction · 0 active" [ref=e63] [cursor=pointer]:
+                - generic [ref=e64]: v46
+                - generic [ref=e65]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e66]:
+              - generic "v45epoch 3 · 2 recent compactions · 1 active" [ref=e67] [cursor=pointer]:
+                - generic [ref=e68]: v45
+                - generic [ref=e69]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e70]:
+              - generic "v44epoch 3 · 2 recent compactions · 1 active" [ref=e71] [cursor=pointer]:
+                - generic [ref=e72]: v44
+                - generic [ref=e73]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e74]:
+              - generic "v43epoch 3 · 1 recent compaction · 0 active" [ref=e75] [cursor=pointer]:
+                - generic [ref=e76]: v43
+                - generic [ref=e77]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e78]:
+              - generic "v42epoch 3 · 2 recent compactions · 1 active" [ref=e79] [cursor=pointer]:
+                - generic [ref=e80]: v42
+                - generic [ref=e81]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e82]:
+              - generic "v41epoch 3 · 2 recent compactions · 1 active" [ref=e83] [cursor=pointer]:
+                - generic [ref=e84]: v41
+                - generic [ref=e85]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e86]:
+              - generic "v40epoch 3 · 1 recent compaction · 0 active" [ref=e87] [cursor=pointer]:
+                - generic [ref=e88]: v40
+                - generic [ref=e89]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e90]:
+              - generic "v39epoch 3 · 2 recent compactions · 1 active" [ref=e91] [cursor=pointer]:
+                - generic [ref=e92]: v39
+                - generic [ref=e93]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e94]:
+              - generic "v38epoch 3 · 2 recent compactions · 1 active" [ref=e95] [cursor=pointer]:
+                - generic [ref=e96]: v38
+                - generic [ref=e97]: epoch 3 · 2 recent compactions · 1 active
+            - group [ref=e98]:
+              - generic "v37epoch 3 · 1 recent compaction · 0 active" [ref=e99] [cursor=pointer]:
+                - generic [ref=e100]: v37
+                - generic [ref=e101]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e102]:
+              - generic "v36epoch 3 · 1 recent compaction · 0 active" [ref=e103] [cursor=pointer]:
+                - generic [ref=e104]: v36
+                - generic [ref=e105]: epoch 3 · 1 recent compaction · 0 active
+            - group [ref=e106]:
+              - generic "v35epoch 2 · 1 recent compaction · 0 active" [ref=e107] [cursor=pointer]:
+                - generic [ref=e108]: v35
+                - generic [ref=e109]: epoch 2 · 1 recent compaction · 0 active
+            - group [ref=e110]:
+              - generic "v34epoch 2 · 2 recent compactions · 1 active" [ref=e111] [cursor=pointer]:
+                - generic [ref=e112]: v34
+                - generic [ref=e113]: epoch 2 · 2 recent compactions · 1 active
+            - group [ref=e114]:
+              - generic "v33epoch 2 · 3 recent compactions · 2 active" [ref=e115] [cursor=pointer]:
+                - generic [ref=e116]: v33
+                - generic [ref=e117]: epoch 2 · 3 recent compactions · 2 active
+            - group [ref=e118]:
+              - generic "v32epoch 2 · 3 recent compactions · 2 active" [ref=e119] [cursor=pointer]:
+                - generic [ref=e120]: v32
+                - generic [ref=e121]: epoch 2 · 3 recent compactions · 2 active
+            - group [ref=e122]:
+              - generic "v31epoch 2 · 2 recent compactions · 1 active" [ref=e123] [cursor=pointer]:
+                - generic [ref=e124]: v31
+                - generic [ref=e125]: epoch 2 · 2 recent compactions · 1 active
+            - group [ref=e126]:
+              - generic "v30epoch 2 · 2 recent compactions · 1 active" [ref=e127] [cursor=pointer]:
+                - generic [ref=e128]: v30
+                - generic [ref=e129]: epoch 2 · 2 recent compactions · 1 active

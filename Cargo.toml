@@ -1,0 +1,42 @@
+[package]
+name = "slatedb-dashboard"
+version = "0.1.0"
+edition = "2021"
+default-run = "slatedb-dashboard"
+description = "Read-only web dashboard for SlateDB"
+license = "Apache-2.0"
+
+[dependencies]
+# Compression + cloud features enabled so the dashboard can inspect any DB
+# regardless of how it was written.
+slatedb = { version = "0.13.1", features = [
+    "compression",
+    "lz4",
+    "zlib",
+    "zstd",
+    "azure",
+    "gcp",
+] }
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+futures = "0.3"
+hex = "0.4"
+lru = "0.12"
+mime_guess = "2"
+rust-embed = "8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+tower-http = { version = "0.6", features = ["trace", "compression-gzip"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ulid = { version = "1", features = ["serde"] }
+uuid = { version = "1", features = ["serde"] }
+
+# To develop against a local slatedb checkout, uncomment:
+# [patch.crates-io]
+# slatedb = { path = "../slatedb/slatedb" }
