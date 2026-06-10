@@ -178,8 +178,11 @@ export default function App() {
         )}
       </aside>
 
-      <header className="sticky top-0 z-20 border-b border-ink-7 bg-surface-0/85 shadow-sm backdrop-blur-md backdrop-saturate-150">
-        <div className="flex h-14 items-center gap-3 px-4">
+      {/* Styled identically to the sidebar's logo row — h-14 with the
+          border INSIDE the box, surface-1, ink-7 — so the two read as one
+          continuous, aligned bar. */}
+      <header className="sticky top-0 z-20">
+        <div className="flex h-14 items-center gap-3 border-b border-ink-7 bg-surface-1 px-4">
           <button
             onClick={() => setNavOpen(true)}
             className="rounded-md p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink-1 lg:hidden"
