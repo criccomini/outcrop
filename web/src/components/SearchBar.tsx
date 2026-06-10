@@ -4,6 +4,9 @@ import { dbUrl, fetchSearch } from '../api/client'
 import type { SearchDto } from '../api/types'
 import { formatBytes, formatRelative } from '../lib/format'
 
+const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-t border-ink-7/50 px-3 py-2 first:border-t-0">
@@ -77,21 +80,54 @@ export function SearchBar({ dbId }: { dbId: string }) {
     }
   }, [open])
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const query = q.trim()
-    if (query === '') return
+  // Stale-response guard: only the latest in-flight search may apply.
+  const seq = useRef(0)
+  const runSearch = async (query: string) => {
+    const id = ++seq.current
     setOpen(true)
     setLoading(true)
     setError(null)
-    setResult(null)
     try {
-      setResult(await fetchSearch(dbId, query))
+      const r = await fetchSearch(dbId, query)
+      if (seq.current === id) setResult(r)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (seq.current === id) {
+        setResult(null)
+        setError(err instanceof Error ? err.message : String(err))
+      }
     } finally {
-      setLoading(false)
+      if (seq.current === id) setLoading(false)
     }
+  }
+
+  const query = q.trim()
+  const validQuery = ULID_RE.test(query) || UUID_RE.test(query)
+
+  // Search as you type: debounced, and only once the text is structurally
+  // a ULID/UUID — partial ids would just 400 against the exact-match API.
+  useEffect(() => {
+    if (query === '') {
+      setOpen(false)
+      setResult(null)
+      setError(null)
+      setLoading(false)
+      return
+    }
+    if (!validQuery) {
+      setResult(null)
+      setError(null)
+      setLoading(false)
+      setOpen(true)
+      return
+    }
+    const t = setTimeout(() => void runSearch(query), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, validQuery, dbId])
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (validQuery) void runSearch(query)
   }
 
   const close = () => setOpen(false)
@@ -119,6 +155,12 @@ export function SearchBar({ dbId }: { dbId: string }) {
       </form>
       {open && (
         <div className="absolute left-0 right-0 top-10 z-40 max-h-[70vh] overflow-y-auto rounded-lg border border-ink-7 bg-surface-1 py-1 shadow-lg">
+          {!validQuery && query !== '' && (
+            <div className="px-3 py-2 text-sm text-ink-5">
+              Keep typing — ULIDs are 26 characters, checkpoint UUIDs 36
+              <span className="ml-1 font-mono text-xs">({query.length})</span>
+            </div>
+          )}
           {loading && <div className="px-3 py-2 text-sm text-ink-4">Searching…</div>}
           {error && <div className="px-3 py-2 text-sm text-red-800">{error}</div>}
           {empty && (
