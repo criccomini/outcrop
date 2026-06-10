@@ -47,4 +47,7 @@ get /compactions | jq -e 'type == "array"' > /dev/null || fail "compactions list
 get /checkpoints | jq -e 'type == "array"' > /dev/null || fail "checkpoints"
 get /clones | jq -e 'type == "array"' > /dev/null || fail "clones"
 
+# /metrics is root-level (Prometheus convention), not under /api.
+curl -fsS "http://$HOST/metrics" | grep -q '^slatedb_up' || fail "metrics"
+
 echo "all endpoints OK"
