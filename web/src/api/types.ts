@@ -98,6 +98,12 @@ export interface ManifestSummaryDto {
   checkpoint_count: number
 }
 
+export interface WarningDto {
+  code: string
+  severity: 'info' | 'warn' | 'error'
+  message: string
+}
+
 export interface OverviewDto {
   db_path: string
   provider: string
@@ -122,6 +128,7 @@ export interface OverviewDto {
   manifest_count: number
   oldest_manifest_id?: number
   latest_manifest_written_at?: string
+  warnings: WarningDto[]
 }
 
 export interface LsmDto {

@@ -17,7 +17,7 @@ get() {
 echo "smoke-testing $BASE ..."
 
 get /health | jq -e '.status == "ok"' > /dev/null || fail "health status"
-get /overview | jq -e '.manifest_id >= 1 and .sst_count >= 0' > /dev/null || fail "overview invariants"
+get /overview | jq -e '.manifest_id >= 1 and .sst_count >= 0 and (.warnings | type == "array")' > /dev/null || fail "overview invariants"
 get /lsm | jq -e '.tree | has("l0") and has("runs")' > /dev/null || fail "lsm shape"
 get /wal | jq -e 'has("next_wal_sst_id") and (.entries | type == "array")' > /dev/null || fail "wal shape"
 

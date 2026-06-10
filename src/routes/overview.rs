@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -8,6 +9,7 @@ use crate::convert;
 use crate::dto::{HealthDto, OverviewDto};
 use crate::error::ApiError;
 use crate::state::AppState;
+use crate::warnings::{compute_warnings, WarningInputs};
 
 pub async fn health(State(state): State<Arc<AppState>>) -> Json<HealthDto> {
     Json(HealthDto {
@@ -39,6 +41,15 @@ pub async fn overview(
         .sequence_tracker()
         .find_ts(m.last_l0_seq(), FindOption::RoundDown);
 
+    let live_manifest_ids: HashSet<u64> = entries.iter().map(|e| e.id).collect();
+    let latest_manifest_written_at = entries.last().map(|e| e.last_modified);
+    let warnings = compute_warnings(&WarningInputs {
+        manifest: &dto,
+        live_manifest_ids: &live_manifest_ids,
+        latest_manifest_written_at,
+        now: chrono::Utc::now(),
+    });
+
     Ok(Json(OverviewDto {
         db_path: state.db_path.clone(),
         provider: state.provider.clone(),
@@ -62,6 +73,7 @@ pub async fn overview(
         wal_object_store_uri: dto.wal_object_store_uri.clone(),
         manifest_count: entries.len(),
         oldest_manifest_id: entries.first().map(|e| e.id),
-        latest_manifest_written_at: entries.last().map(|e| e.last_modified),
+        latest_manifest_written_at,
+        warnings,
     }))
 }

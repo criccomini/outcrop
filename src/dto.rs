@@ -133,6 +133,14 @@ pub struct ManifestSummaryDto {
     pub checkpoint_count: usize,
 }
 
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct WarningDto {
+    pub code: &'static str,
+    /// "info" | "warn" | "error"
+    pub severity: &'static str,
+    pub message: String,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct OverviewDto {
     pub db_path: String,
@@ -162,6 +170,7 @@ pub struct OverviewDto {
     pub oldest_manifest_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latest_manifest_written_at: Option<DateTime<Utc>>,
+    pub warnings: Vec<WarningDto>,
 }
 
 #[derive(Serialize, Clone, Debug)]
