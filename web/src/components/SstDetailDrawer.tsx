@@ -105,13 +105,21 @@ export function SstDetailDrawer({
                   </tr>
                 </thead>
                 <tbody>
-                  {sst.index.blocks.slice(0, 200).map((b) => (
+                  {sst.index.blocks.slice(0, 200).map((b, i) => (
                     <tr key={b.offset} className="border-t border-ink-7/50">
                       <td className="py-0.5 pr-2 font-mono text-ink-4">
                         {b.offset.toLocaleString()}
                       </td>
                       <td className="py-0.5">
-                        <KeyDisplay k={b.first_key} />
+                        {/* The format stores an empty first key for block 0;
+                            the SST's own first key is the real one. */}
+                        <KeyDisplay
+                          k={
+                            i === 0 && b.first_key.hex === ''
+                              ? sst.info.first_key
+                              : b.first_key
+                          }
+                        />
                       </td>
                     </tr>
                   ))}
