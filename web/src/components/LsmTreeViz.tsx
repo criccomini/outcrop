@@ -56,30 +56,35 @@ export function SizeView({
       {levels.map((level) => (
         <div key={level.label} className="flex items-center gap-3">
           <LevelLabel level={level} />
-          <div
-            className="flex h-7 gap-px"
-            style={{ width: `${Math.max((level.bytes / maxBytes) * 100, 1)}%` }}
-          >
-            {level.ssts.map((sst) => (
-              <button
-                key={sst.view_id}
-                title={sstTitle(sst)}
-                onClick={() => {
-                  const ulid = sstUlid(sst)
-                  if (ulid) onSelect(ulid)
-                }}
-                className={`min-w-0.5 rounded-[2px] transition-opacity hover:opacity-75 ${
-                  selected === sstUlid(sst) ? 'ring-2 ring-accent-high' : ''
-                }`}
-                style={{
-                  backgroundColor: level.color,
-                  flexGrow: Math.max(sst.est_bytes, 1),
-                }}
-              />
-            ))}
-            {level.ssts.length === 0 && (
-              <div className="self-center text-xs text-ink-5">empty</div>
-            )}
+          {/* The percentage must resolve against this track, not the row:
+              sized against the row, the 100% bar gets flex-shrunk while
+              smaller bars don't, distorting the proportions. */}
+          <div className="min-w-0 flex-1">
+            <div
+              className="flex h-7 gap-px"
+              style={{ width: `${Math.max((level.bytes / maxBytes) * 100, 1)}%` }}
+            >
+              {level.ssts.map((sst) => (
+                <button
+                  key={sst.view_id}
+                  title={sstTitle(sst)}
+                  onClick={() => {
+                    const ulid = sstUlid(sst)
+                    if (ulid) onSelect(ulid)
+                  }}
+                  className={`min-w-0.5 rounded-[2px] transition-opacity hover:opacity-75 ${
+                    selected === sstUlid(sst) ? 'ring-2 ring-accent-high' : ''
+                  }`}
+                  style={{
+                    backgroundColor: level.color,
+                    flexGrow: Math.max(sst.est_bytes, 1),
+                  }}
+                />
+              ))}
+              {level.ssts.length === 0 && (
+                <div className="self-center text-xs text-ink-5">empty</div>
+              )}
+            </div>
           </div>
         </div>
       ))}
