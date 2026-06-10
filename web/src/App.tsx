@@ -77,34 +77,49 @@ const NAV_LINK_STYLE = ({ isActive }: { isActive: boolean }) =>
 
 /**
  * Sidebar contents: the fleet link, and — when a DB is active — the DB
- * switcher plus that DB's page nav.
+ * switcher plus that DB's page nav. `collapsed` renders an icon-only rail
+ * (desktop only; the mobile drawer is always expanded).
  */
 function SidebarNav({
   dbId,
   subPath,
   alertCount,
+  collapsed = false,
   onNavigate,
 }: {
   dbId: string | null
   subPath: string
   alertCount: number
+  collapsed?: boolean
   onNavigate?: () => void
 }) {
   const dbs = useDbs()
   const navigate = useNavigate()
   const list = dbs.data?.dbs ?? []
+  const linkStyle = ({ isActive }: { isActive: boolean }) =>
+    `${NAV_LINK_STYLE({ isActive })} ${collapsed ? 'justify-center px-0' : ''}`
   return (
     <nav className="flex flex-col gap-0.5 text-sm font-medium">
-      <NavLink to="/" end onClick={onNavigate} className={NAV_LINK_STYLE}>
+      <NavLink
+        to="/"
+        end
+        onClick={onNavigate}
+        className={linkStyle}
+        title={collapsed ? 'All databases' : undefined}
+      >
         <NavIcon name="grid" />
-        <span className="flex-1">All databases</span>
-        {list.length > 0 && (
-          <span className="text-xs text-ink-5">{list.length}</span>
+        {!collapsed && (
+          <>
+            <span className="flex-1">All databases</span>
+            {list.length > 0 && (
+              <span className="text-xs text-ink-5">{list.length}</span>
+            )}
+          </>
         )}
       </NavLink>
       {dbId !== null && (
         <>
-          {list.length > 1 && (
+          {!collapsed && list.length > 1 && (
             <select
               value={dbId}
               onChange={(e) => {
@@ -128,14 +143,24 @@ function SidebarNav({
                 to={`/db/${encodeURIComponent(dbId)}${item.to}`}
                 end={item.to === ''}
                 onClick={onNavigate}
-                className={NAV_LINK_STYLE}
+                className={linkStyle}
+                title={collapsed ? item.label : undefined}
               >
-                <NavIcon name={item.icon} />
-                <span className="flex-1">{item.label}</span>
-                {item.to === '/alerts' && alertCount > 0 && (
-                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
-                    {alertCount}
-                  </span>
+                <span className="relative">
+                  <NavIcon name={item.icon} />
+                  {collapsed && item.to === '/alerts' && alertCount > 0 && (
+                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent" />
+                  )}
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className="flex-1">{item.label}</span>
+                    {item.to === '/alerts' && alertCount > 0 && (
+                      <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
+                        {alertCount}
+                      </span>
+                    )}
+                  </>
                 )}
               </NavLink>
             ))}
@@ -149,6 +174,14 @@ function SidebarNav({
 export default function App() {
   const location = useLocation()
   const [navOpen, setNavOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('sdb-nav-collapsed') === '1',
+  )
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      localStorage.setItem('sdb-nav-collapsed', c ? '0' : '1')
+      return !c
+    })
   const match = matchPath('/db/:dbId/*', location.pathname)
   const dbId = match?.params.dbId ? decodeURIComponent(match.params.dbId) : null
   const subPath = match?.params['*'] ? `/${match.params['*']}` : ''
@@ -160,22 +193,72 @@ export default function App() {
       ? 0
       : (overview.data?.warnings.filter((w) => w.severity !== 'info').length ?? 0)
   return (
-    <div className="min-h-screen lg:pl-56">
-      {/* Desktop: full-height drawer flush against the left edge. */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-ink-7 bg-surface-1 lg:flex">
-        <div className="flex h-14 shrink-0 items-center border-b border-ink-7 px-4">
+    <div className={`min-h-screen ${collapsed ? 'lg:pl-14' : 'lg:pl-56'}`}>
+      {/* Desktop: full-height drawer flush against the left edge,
+          collapsible to an icon rail. */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-ink-7 bg-surface-1 lg:flex ${
+          collapsed ? 'w-14' : 'w-56'
+        }`}
+      >
+        <div
+          className={`flex h-14 shrink-0 items-center border-b border-ink-7 ${
+            collapsed ? 'justify-center' : 'px-4'
+          }`}
+        >
           <a href="/" className="flex items-center">
-            <img src="/img/logo-full.svg" alt="SlateDB" className="h-7" />
+            <img
+              src={collapsed ? '/img/logo.svg' : '/img/logo-full.svg'}
+              alt="SlateDB"
+              // The standalone mark is white-filled (made for dark
+              // backgrounds); invert it onto our light rail.
+              className={collapsed ? 'h-7 invert' : 'h-7'}
+            />
           </a>
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          <SidebarNav dbId={dbId} subPath={subPath} alertCount={alertCount} />
+        <div className={`flex-1 overflow-y-auto ${collapsed ? 'p-2' : 'p-3'}`}>
+          <SidebarNav
+            dbId={dbId}
+            subPath={subPath}
+            alertCount={alertCount}
+            collapsed={collapsed}
+          />
         </div>
-        {dbId && (
-          <div className="shrink-0 border-t border-ink-7 px-4 py-3 font-mono text-xs text-ink-4">
-            {dbId}
-          </div>
-        )}
+        <div
+          className={`flex h-11 shrink-0 items-center gap-2 border-t border-ink-7 ${
+            collapsed ? 'justify-center' : 'px-4'
+          }`}
+        >
+          {!collapsed && dbId && (
+            <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-4">
+              {dbId}
+            </span>
+          )}
+          {!collapsed && !dbId && <span className="flex-1" />}
+          <button
+            onClick={toggleCollapsed}
+            className="rounded-md p-1 text-ink-4 hover:bg-surface-2 hover:text-ink-1"
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={collapsed ? 'Expand' : 'Collapse'}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {collapsed ? (
+                <path d="M7.5 4.5 13 10l-5.5 5.5" />
+              ) : (
+                <path d="M12.5 4.5 7 10l5.5 5.5" />
+              )}
+            </svg>
+          </button>
+        </div>
       </aside>
 
       {/* Styled identically to the sidebar's logo row — h-14 with the
