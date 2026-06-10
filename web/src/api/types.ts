@@ -289,3 +289,30 @@ export interface HealthDto {
   db_path: string
   provider: string
 }
+
+export interface GarbageCategoryDto {
+  stored_count: number
+  stored_bytes: number
+  live_count: number
+  live_bytes: number
+  pinned_count: number
+  pinned_bytes: number
+  reclaimable_count: number
+  reclaimable_bytes: number
+}
+
+export interface GarbageDto {
+  manifest_id: number
+  live_checkpoint_count: number
+  expired_checkpoint_count: number
+  dangling_checkpoint_count: number
+  compacted: GarbageCategoryDto
+  wal: GarbageCategoryDto
+  manifests: GarbageCategoryDto
+  stored_bytes: number
+  live_bytes: number
+  pinned_bytes: number
+  reclaimable_bytes: number
+  space_amp?: number
+  oldest_reclaimable_at?: string
+}

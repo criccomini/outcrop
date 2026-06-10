@@ -4,6 +4,7 @@ import type {
   CheckpointStatusDto,
   CompactorStateDto,
   ExternalDbDto,
+  GarbageDto,
   HealthDto,
   LsmDto,
   ManifestDiffDto,
@@ -148,6 +149,14 @@ export function useCheckpoints() {
   return useQuery<CheckpointStatusDto[], ApiRequestError>({
     queryKey: ['checkpoints'],
     queryFn: () => fetchJson('/api/checkpoints'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useGarbage() {
+  return useQuery<GarbageDto, ApiRequestError>({
+    queryKey: ['garbage'],
+    queryFn: () => fetchJson('/api/garbage'),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }

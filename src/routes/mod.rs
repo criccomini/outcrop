@@ -1,6 +1,7 @@
 mod activity;
 mod checkpoints;
 mod compactions;
+mod garbage;
 mod lsm;
 mod manifests;
 mod metrics;
@@ -32,6 +33,7 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/compactions/{ulid}", get(compactions::get_one))
         .route("/api/checkpoints", get(checkpoints::list))
         .route("/api/clones", get(checkpoints::clones))
+        .route("/api/garbage", get(garbage::garbage))
         // Root-level by Prometheus convention, intentionally not under /api.
         .route("/metrics", get(metrics::metrics))
         .with_state(state)

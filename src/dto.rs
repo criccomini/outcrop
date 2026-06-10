@@ -367,3 +367,41 @@ pub struct HealthDto {
     pub db_path: String,
     pub provider: String,
 }
+
+/// Per-directory breakdown of stored objects: live (referenced by the latest
+/// manifest), pinned (kept alive only by an unexpired checkpoint), and
+/// reclaimable (what the GC would eventually delete).
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct GarbageCategoryDto {
+    pub stored_count: usize,
+    pub stored_bytes: u64,
+    pub live_count: usize,
+    pub live_bytes: u64,
+    pub pinned_count: usize,
+    pub pinned_bytes: u64,
+    pub reclaimable_count: usize,
+    pub reclaimable_bytes: u64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct GarbageDto {
+    pub manifest_id: u64,
+    pub live_checkpoint_count: usize,
+    pub expired_checkpoint_count: usize,
+    /// Unexpired checkpoints whose manifest no longer exists.
+    pub dangling_checkpoint_count: usize,
+    pub compacted: GarbageCategoryDto,
+    pub wal: GarbageCategoryDto,
+    pub manifests: GarbageCategoryDto,
+    pub stored_bytes: u64,
+    pub live_bytes: u64,
+    pub pinned_bytes: u64,
+    pub reclaimable_bytes: u64,
+    /// stored / live over data objects (compacted + WAL); absent when
+    /// nothing is live.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_amp: Option<f64>,
+    /// When the oldest reclaimable object was written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oldest_reclaimable_at: Option<DateTime<Utc>>,
+}

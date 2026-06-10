@@ -4,6 +4,7 @@ mod convert;
 mod diff;
 mod dto;
 mod error;
+mod garbage;
 mod routes;
 mod state;
 mod warnings;

@@ -46,6 +46,7 @@ get /compactor/state | jq -e 'has("manifest_id")' > /dev/null || fail "compactor
 get /compactions | jq -e 'type == "array"' > /dev/null || fail "compactions list"
 get /checkpoints | jq -e 'type == "array"' > /dev/null || fail "checkpoints"
 get /clones | jq -e 'type == "array"' > /dev/null || fail "clones"
+get /garbage | jq -e '.stored_bytes >= 0 and (.compacted.stored_count >= 0) and (.stored_bytes == .live_bytes + .pinned_bytes + .reclaimable_bytes)' > /dev/null || fail "garbage invariants"
 
 # /metrics is root-level (Prometheus convention), not under /api.
 curl -fsS "http://$HOST/metrics" | grep -q '^slatedb_up' || fail "metrics"

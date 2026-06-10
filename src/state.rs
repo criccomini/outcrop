@@ -19,6 +19,7 @@ use crate::error::ApiError;
 #[derive(Clone, Debug)]
 pub struct ManifestEntry {
     pub id: u64,
+    pub size_bytes: u64,
     pub last_modified: DateTime<Utc>,
 }
 
@@ -26,6 +27,14 @@ pub struct ManifestEntry {
 #[derive(Clone, Debug)]
 pub struct WalEntry {
     pub id: u64,
+    pub size_bytes: u64,
+    pub last_modified: DateTime<Utc>,
+}
+
+/// A compacted SST as seen by a raw object-store listing.
+#[derive(Clone, Debug)]
+pub struct CompactedEntry {
+    pub ulid: Ulid,
     pub size_bytes: u64,
     pub last_modified: DateTime<Utc>,
 }
@@ -40,6 +49,7 @@ pub struct AppState {
     pub latest_manifest: TtlCache<Option<VersionedManifest>>,
     pub manifest_listing: TtlCache<Vec<ManifestEntry>>,
     pub wal_listing: TtlCache<Vec<WalEntry>>,
+    pub compacted_listing: TtlCache<Vec<CompactedEntry>>,
     pub compactor_state: TtlCache<CompactorStateDto>,
     pub manifest_by_id: LruMap<u64, VersionedManifest>,
     pub sst_details: LruMap<Ulid, SstDetailDto>,
@@ -64,6 +74,7 @@ impl AppState {
             latest_manifest: TtlCache::new(ttl),
             manifest_listing: TtlCache::new(ttl),
             wal_listing: TtlCache::new(ttl),
+            compacted_listing: TtlCache::new(ttl),
             compactor_state: TtlCache::new(ttl),
             manifest_by_id: LruMap::new(256),
             sst_details: LruMap::new(64),
@@ -104,6 +115,7 @@ impl AppState {
                     };
                     entries.push(ManifestEntry {
                         id,
+                        size_bytes: meta.size,
                         last_modified: meta.last_modified,
                     });
                 }
@@ -141,6 +153,39 @@ impl AppState {
                     });
                 }
                 entries.sort_by_key(|e| e.id);
+                Ok(entries)
+            })
+            .await
+    }
+
+    /// Listing of compacted SSTs, ascending by ULID. One object-store LIST.
+    pub async fn compacted_entries(&self) -> Result<Arc<Vec<CompactedEntry>>, ApiError> {
+        self.compacted_listing
+            .get_with(|| async {
+                let prefix = self.root_path.child("compacted");
+                let mut stream = self.object_store.list(Some(&prefix));
+                let mut entries = Vec::new();
+                while let Some(meta) = stream
+                    .try_next()
+                    .await
+                    .map_err(|e| ApiError::Internal(format!("listing compacted: {e}")))?
+                {
+                    let Some(name) = meta.location.filename() else {
+                        continue;
+                    };
+                    let Some(stem) = name.strip_suffix(".sst") else {
+                        continue;
+                    };
+                    let Ok(ulid) = Ulid::from_string(stem) else {
+                        continue;
+                    };
+                    entries.push(CompactedEntry {
+                        ulid,
+                        size_bytes: meta.size,
+                        last_modified: meta.last_modified,
+                    });
+                }
+                entries.sort_by_key(|e| e.ulid);
                 Ok(entries)
             })
             .await

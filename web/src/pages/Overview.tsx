@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useOverview } from '../api/client'
 import type { WarningDto } from '../api/types'
+import { GarbagePanel } from '../components/GarbagePanel'
 import { Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
@@ -135,6 +136,9 @@ export default function Overview() {
           </div>
         )}
       </QueryGate>
+      <div className="mt-6">
+        <GarbagePanel />
+      </div>
     </div>
   )
 }
