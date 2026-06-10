@@ -251,6 +251,13 @@ export interface ManifestDiffDto {
   scalars: ScalarChangeDto[]
 }
 
+export interface ActivityDto {
+  a: number
+  b: number
+  at: string
+  diff: ManifestDiffDto
+}
+
 export interface HealthDto {
   status: string
   db_path: string

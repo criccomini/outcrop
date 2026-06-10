@@ -316,6 +316,16 @@ pub struct ManifestDiffDto {
     pub scalars: Vec<ScalarChangeDto>,
 }
 
+/// One manifest transition (a → b) in the activity feed.
+#[derive(Serialize, Clone, Debug)]
+pub struct ActivityDto {
+    pub a: u64,
+    pub b: u64,
+    /// When manifest `b` was written.
+    pub at: DateTime<Utc>,
+    pub diff: ManifestDiffDto,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct HealthDto {
     pub status: &'static str,

@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { useHealth } from './api/client'
 import Overview from './pages/Overview'
+import Activity from './pages/Activity'
 import Lsm from './pages/Lsm'
 import Manifests from './pages/Manifests'
 import ManifestDetail from './pages/ManifestDetail'
@@ -10,6 +11,7 @@ import Checkpoints from './pages/Checkpoints'
 
 const NAV = [
   { to: '/', label: 'Overview' },
+  { to: '/activity', label: 'Activity' },
   { to: '/lsm', label: 'LSM Tree' },
   { to: '/manifests', label: 'Manifests' },
   { to: '/compactions', label: 'Compactions' },
@@ -59,6 +61,7 @@ export default function App() {
       <main className="mx-auto max-w-7xl px-4 py-8">
         <Routes>
           <Route path="/" element={<Overview />} />
+          <Route path="/activity" element={<Activity />} />
           <Route path="/lsm" element={<Lsm />} />
           <Route path="/manifests" element={<Manifests />} />
           <Route path="/manifests/diff" element={<ManifestDiff />} />

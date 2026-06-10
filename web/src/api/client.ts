@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type {
+  ActivityDto,
   CheckpointStatusDto,
   CompactorStateDto,
   ExternalDbDto,
@@ -59,6 +60,14 @@ export function useLsm() {
   return useQuery<LsmDto, ApiRequestError>({
     queryKey: ['lsm'],
     queryFn: () => fetchJson('/api/lsm'),
+    refetchInterval: LIVE_REFETCH_MS,
+  })
+}
+
+export function useActivity(limit = 20) {
+  return useQuery<ActivityDto[], ApiRequestError>({
+    queryKey: ['activity', limit],
+    queryFn: () => fetchJson(`/api/activity?limit=${limit}`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }

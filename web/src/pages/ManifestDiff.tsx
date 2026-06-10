@@ -1,29 +1,11 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { useManifestDiff } from '../api/client'
-import type { ManifestDiffDto, SstViewDto } from '../api/types'
+import type { SstViewDto } from '../api/types'
 import { KeyDisplay } from '../components/KeyDisplay'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes } from '../lib/format'
-
-function narrative(d: ManifestDiffDto): string {
-  const parts: string[] = []
-  if (d.l0_added.length) parts.push(`${d.l0_added.length} L0 SST${d.l0_added.length > 1 ? 's' : ''} flushed`)
-  if (d.l0_removed.length && d.runs_added.length)
-    parts.push(
-      `${d.l0_removed.length} L0 SST${d.l0_removed.length > 1 ? 's' : ''} compacted into ${d.runs_added.map((r) => `SR ${r.id}`).join(', ')}`,
-    )
-  else {
-    if (d.l0_removed.length) parts.push(`${d.l0_removed.length} L0 SSTs removed`)
-    if (d.runs_added.length) parts.push(`runs added: ${d.runs_added.map((r) => `SR ${r.id}`).join(', ')}`)
-  }
-  if (d.runs_removed.length) parts.push(`runs removed: ${d.runs_removed.map((r) => `SR ${r.id}`).join(', ')}`)
-  if (d.runs_changed.length) parts.push(`${d.runs_changed.length} run${d.runs_changed.length > 1 ? 's' : ''} changed`)
-  if (d.checkpoints_added.length) parts.push(`${d.checkpoints_added.length} checkpoint${d.checkpoints_added.length > 1 ? 's' : ''} added`)
-  if (d.checkpoints_removed.length) parts.push(`${d.checkpoints_removed.length} checkpoint${d.checkpoints_removed.length > 1 ? 's' : ''} removed`)
-  if (parts.length === 0) parts.push('only scalar fields changed')
-  return parts.join('; ')
-}
+import { narrative } from '../lib/narrative'
 
 function SstChips({ ssts, tone }: { ssts: SstViewDto[]; tone: 'add' | 'del' }) {
   if (ssts.length === 0) return <span className="text-sm text-ink-5">none</span>

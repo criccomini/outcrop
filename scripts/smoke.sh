@@ -38,6 +38,7 @@ else
   echo "  (no compacted SSTs to drill into)"
 fi
 
+get "/activity?limit=5" | jq -e 'type == "array"' > /dev/null || fail "activity"
 get /compactor/state | jq -e 'has("manifest_id")' > /dev/null || fail "compactor state"
 get /compactions | jq -e 'type == "array"' > /dev/null || fail "compactions list"
 get /checkpoints | jq -e 'type == "array"' > /dev/null || fail "checkpoints"
