@@ -13,10 +13,24 @@ export default function Lsm() {
   const [params, setParams] = useSearchParams()
   const rawId = params.get('manifest_id')
   const manifestId = rawId !== null ? Number(rawId) : undefined
-  // ?sst=ULID (e.g. from search results) opens the drawer on load.
-  const [selected, setSelected] = useState<string | null>(() =>
-    params.get('sst'),
-  )
+  // ?sst=ULID (e.g. from search results) opens the drawer — on load, and
+  // when the param changes while the page is already mounted (clicking a
+  // search result from the LSM page itself only updates the URL).
+  const sstParam = params.get('sst')
+  const [selected, setSelected] = useState<string | null>(() => sstParam)
+  useEffect(() => {
+    if (sstParam) setSelected(sstParam)
+  }, [sstParam])
+  // Closing also strips ?sst=, so re-clicking the same search result is a
+  // param change again rather than a no-op.
+  function closeDrawer() {
+    setSelected(null)
+    if (params.has('sst')) {
+      const next = new URLSearchParams(params)
+      next.delete('sst')
+      setParams(next, { replace: true })
+    }
+  }
   // -1 = no explicit pick: the server returns the root tree, or falls
   // through to segment 0 when a segmented DB's root is empty.
   const [segmentIdx, setSegmentIdx] = useState<number>(-1)
@@ -182,9 +196,7 @@ export default function Lsm() {
           )
         }}
       </QueryGate>
-      {selected && (
-        <SstDetailDrawer ulid={selected} onClose={() => setSelected(null)} />
-      )}
+      {selected && <SstDetailDrawer ulid={selected} onClose={closeDrawer} />}
     </div>
   )
 }
