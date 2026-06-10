@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { useHealth } from './api/client'
+import { RefreshTimer } from './components/RefreshTimer'
 import Overview from './pages/Overview'
 import Activity from './pages/Activity'
 import Lsm from './pages/Lsm'
@@ -50,6 +51,7 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3">
+            <RefreshTimer />
             {health.data && (
               <span className="hidden font-mono text-xs text-ink-4 md:inline">
                 {health.data.provider}://{health.data.db_path}
