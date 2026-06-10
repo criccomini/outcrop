@@ -94,7 +94,7 @@ export default function Lsm() {
                   </span>
                 )}
                 {lsm.segment_extractor_name && (
-                  <span>
+                  <span className="ml-auto rounded-full border border-ink-6 bg-surface-2 px-2.5 py-0.5 text-xs">
                     segment extractor:{' '}
                     <span className="font-mono">
                       {lsm.segment_extractor_name}
