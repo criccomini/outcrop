@@ -61,9 +61,11 @@ export function RefreshTimer() {
   if (state === null && fetching === 0) return null
   const frac = fetching > 0 ? 0.25 : (state?.frac ?? 0)
   return (
-    <span
-      className="relative hidden h-[22px] w-[22px] shrink-0 sm:inline-block"
-      title="Live data refreshes automatically"
+    <button
+      onClick={() => queryClient.refetchQueries({ type: 'active' })}
+      className="relative inline-block h-[22px] w-[22px] shrink-0 cursor-pointer"
+      title="Auto-refreshes when the ring empties — click to refresh now"
+      aria-label="Refresh now"
     >
       <svg
         width="22"
@@ -97,6 +99,6 @@ export function RefreshTimer() {
           {state.secs}
         </span>
       )}
-    </span>
+    </button>
   )
 }
