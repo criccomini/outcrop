@@ -82,14 +82,10 @@ export default function Fleet({ store }: { store?: string }) {
   return (
     <div>
       <div className="flex items-center justify-between">
+        {/* No font-mono here: the mono fallback's taller line box nudges
+            the heading down a couple of pixels vs the plain title. */}
         <h1 className="text-3xl">
-          {store !== undefined ? (
-            <>
-              Databases in <span className="font-mono">{store}</span>
-            </>
-          ) : (
-            'Databases'
-          )}
+          {store !== undefined ? `Databases in ${store}` : 'Databases'}
         </h1>
         <button
           onClick={rescan}
