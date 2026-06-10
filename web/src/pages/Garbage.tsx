@@ -7,54 +7,6 @@ import { QueryGate } from '../components/QueryGate'
 import { classify } from '../lib/feed'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
-/**
- * Banners derived from the garbage report. GC runs embedded in a writer or
- * standalone process the dashboard can't see, so "is it running?" is
- * inferred from the evidence it leaves behind.
- */
-function HealthHints({ g }: { g?: GarbageDto }) {
-  if (!g) return null
-  const hints: { key: string; style: string; text: string }[] = []
-  const warn = 'border-accent/40 bg-accent-low text-accent-high'
-  const info = 'border-ink-7 bg-surface-2 text-ink-3'
-  if (g.expired_checkpoint_count > 0) {
-    hints.push({
-      key: 'expired',
-      style: warn,
-      text: `${g.expired_checkpoint_count} expired checkpoint${g.expired_checkpoint_count > 1 ? 's' : ''} still recorded in the manifest — the GC removes these on its next sweep.`,
-    })
-  }
-  if (g.dangling_checkpoint_count > 0) {
-    hints.push({
-      key: 'dangling',
-      style: warn,
-      text: `${g.dangling_checkpoint_count} unexpired checkpoint${g.dangling_checkpoint_count > 1 ? 's' : ''} reference a manifest that no longer exists — readers cannot open ${g.dangling_checkpoint_count > 1 ? 'them' : 'it'}.`,
-    })
-  }
-  const oldest = g.oldest_reclaimable_at ? Date.parse(g.oldest_reclaimable_at) : NaN
-  if (
-    g.reclaimable_bytes > 0 &&
-    !Number.isNaN(oldest) &&
-    Date.now() - oldest > 30 * 60_000
-  ) {
-    hints.push({
-      key: 'stale-garbage',
-      style: info,
-      text: `The oldest reclaimable object was written ${formatRelative(g.oldest_reclaimable_at)}. With slatedb's default GC cadence (sweep every minute, 5-minute min age) this backlog suggests no GC is currently running against this DB.`,
-    })
-  }
-  if (hints.length === 0) return null
-  return (
-    <div className="space-y-1.5">
-      {hints.map((h) => (
-        <div key={h.key} className={`rounded-lg border px-4 py-2 text-sm ${h.style}`}>
-          {h.text}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function Pinners({ g }: { g: GarbageDto }) {
   if (g.pinners.length === 0) {
     return (
@@ -187,7 +139,6 @@ export default function Garbage() {
     <div>
       <h1 className="text-3xl">Garbage Collection</h1>
       <div className="mt-6 space-y-5">
-        <HealthHints g={query.data} />
         <GarbagePanel />
         <Panel title="Checkpoints pinning storage">
           <QueryGate query={query}>{(g) => <Pinners g={g} />}</QueryGate>
