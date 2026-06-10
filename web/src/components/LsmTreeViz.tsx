@@ -106,7 +106,9 @@ export function KeyRangeView({
   selected: string | null
   onSelect: (ulid: string) => void
 }) {
-  const levels = buildLevels(tree)
+  // Memoized so the rank map below is only rebuilt when the tree changes,
+  // not on every selection-induced re-render.
+  const levels = useMemo(() => buildLevels(tree), [tree])
 
   const pos = useMemo(() => {
     // Hex strings compare in byte order, so ranking hex keys ranks keys.
