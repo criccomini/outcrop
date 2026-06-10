@@ -50,6 +50,12 @@ polling cost stays bounded).
 # the dashboard itself never does), then serve it:
 cargo run --bin seed
 CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
+
+# Or simulate live traffic (Ctrl-C to stop) and watch the dashboard move:
+# puts/deletes at a slowly swinging rate, embedded compactor and GC enabled,
+# short-lived checkpoints every couple of minutes. Works on a fresh dir or
+# on top of an existing demo DB.
+cargo run --bin seed -- --traffic            # --rate, --checkpoint-secs
 ```
 
 Note: `LOCAL_PATH` must be absolute — the object store canonicalizes it.

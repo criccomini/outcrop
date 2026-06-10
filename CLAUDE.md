@@ -18,6 +18,10 @@ cargo run --bin seed
 CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
 # LOCAL_PATH must be absolute. Serves UI + API on 127.0.0.1:8333.
 
+# Continuous traffic simulation (Ctrl-C to stop): varying-rate puts/deletes
+# with the embedded compactor + GC enabled, for watching the dashboard live
+cargo run --bin seed -- --traffic
+
 cargo test                          # backend unit tests
 cargo test diff::                   # single module (also: convert::, cache::)
 ./scripts/smoke.sh                  # curl every endpoint against a running server
