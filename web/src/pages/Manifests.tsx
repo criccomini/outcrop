@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useDbPath, useManifests } from '../api/client'
+import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative } from '../lib/format'
@@ -35,7 +36,14 @@ export default function Manifests() {
       <div className="mt-6">
         <QueryGate query={query}>
           {(manifests) => (
-            <Panel>
+            <Panel
+              action={
+                <HelpTip>
+                  Newest first. Pick two versions with the checkboxes, then
+                  use the Diff button to compare them.
+                </HelpTip>
+              }
+            >
               <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -94,9 +102,6 @@ export default function Manifests() {
                 </tbody>
               </table>
               </div>
-              <p className="mt-3 text-xs text-ink-5">
-                Newest first. Pick two versions to diff them.
-              </p>
             </Panel>
           )}
         </QueryGate>

@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { rescanDbs, useDbs, useOverview } from '../api/client'
 import type { DbInfoDto } from '../api/types'
+import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative } from '../lib/format'
@@ -91,7 +92,17 @@ export default function Fleet() {
       <div className="mt-6">
         <QueryGate query={query}>
           {(d) => (
-            <Panel>
+            <Panel
+              action={
+                <HelpTip>
+                  Auto-discovered by walking the configured stores for
+                  prefixes with a manifest/ directory (last scan{' '}
+                  {formatRelative(d.scanned_at)}); rescans happen
+                  automatically in the background, or on demand with the
+                  Rescan button.
+                </HelpTip>
+              }
+            >
               {d.dbs.length === 0 ? (
                 <span className="text-sm text-ink-5">
                   No SlateDBs discovered under the configured roots. DBs are
@@ -119,11 +130,6 @@ export default function Fleet() {
                 </table>
                 </div>
               )}
-              <p className="mt-3 text-xs text-ink-5">
-                Auto-discovered by walking the configured stores (last scan{' '}
-                {formatRelative(d.scanned_at)}); rescans happen automatically
-                in the background.
-              </p>
             </Panel>
           )}
         </QueryGate>

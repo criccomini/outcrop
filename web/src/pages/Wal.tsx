@@ -1,4 +1,5 @@
 import { useWal } from '../api/client'
+import { HelpTip } from '../components/HelpTip'
 import { Panel, Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
@@ -47,7 +48,16 @@ export default function Wal() {
                 />
               </div>
 
-              <Panel title={`WAL SSTs (${wal.entries.length})`}>
+              <Panel
+                title={`WAL SSTs (${wal.entries.length})`}
+                action={
+                  <HelpTip>
+                    Newest first. Un-replayed SSTs (id above the replay
+                    watermark) would be re-read into memtables on writer
+                    restart; replayed ones are awaiting garbage collection.
+                  </HelpTip>
+                }
+              >
                 {wal.entries.length === 0 ? (
                   <span className="text-sm text-ink-5">
                     {wal.wal_object_store_uri
@@ -103,11 +113,6 @@ export default function Wal() {
                   </table>
                   </div>
                 )}
-                <p className="mt-3 text-xs text-ink-5">
-                  Newest first. Un-replayed SSTs (id above the replay
-                  watermark) would be re-read into memtables on writer
-                  restart; replayed ones are awaiting garbage collection.
-                </p>
               </Panel>
             </div>
           )

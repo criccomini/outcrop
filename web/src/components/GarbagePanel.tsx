@@ -1,6 +1,7 @@
 import { useGarbage } from '../api/client'
 import type { GarbageCategoryDto, GarbageDto } from '../api/types'
 import { formatBytes, formatRelative } from '../lib/format'
+import { HelpTip } from './HelpTip'
 import { Panel } from './Panel'
 import { QueryGate } from './QueryGate'
 
@@ -70,8 +71,27 @@ function CategoryRow({ label, c }: { label: string; c: GarbageCategoryDto }) {
 
 export function GarbagePanel({ action }: { action?: React.ReactNode }) {
   const query = useGarbage()
+  const help = (
+    <HelpTip>
+      Live = referenced by the latest manifest; pinned = kept only by an
+      unexpired checkpoint; reclaimable = what the garbage collector would
+      eventually delete (its min-age grace periods are ignored here).
+    </HelpTip>
+  )
   return (
-    <Panel title="Storage &amp; garbage" action={action}>
+    <Panel
+      title="Storage &amp; garbage"
+      action={
+        action ? (
+          <span className="flex items-center gap-3">
+            {action}
+            {help}
+          </span>
+        ) : (
+          help
+        )
+      }
+    >
       <QueryGate query={query}>
         {(g) => (
           <div>
@@ -134,11 +154,6 @@ export function GarbagePanel({ action }: { action?: React.ReactNode }) {
                 <CategoryRow label="Manifests" c={g.manifests} />
               </tbody>
             </table>
-            </div>
-            <div className="mt-3 text-xs text-ink-5">
-              Live = referenced by the latest manifest; pinned = kept only by an
-              unexpired checkpoint; reclaimable = what the garbage collector would
-              eventually delete (its min-age grace periods are ignored here).
             </div>
           </div>
         )}

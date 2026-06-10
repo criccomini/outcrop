@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLsm, useManifestIds } from '../api/client'
+import { HelpTip } from '../components/HelpTip'
 import { KeyRangeView, SizeView } from '../components/LsmTreeViz'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
@@ -124,26 +125,34 @@ export default function Lsm() {
                 </div>
               )}
 
-              <Panel title="Levels by size">
+              <Panel
+                title="Levels by size"
+                action={
+                  <HelpTip>
+                    Bar length is proportional to level size; segments within
+                    a bar are individual SSTs. Click an SST for details.
+                  </HelpTip>
+                }
+              >
                 <SizeView tree={tree} selected={selected} onSelect={setSelected} />
-                <p className="mt-3 text-xs text-ink-5">
-                  Bar length is proportional to level size; segments within a
-                  bar are individual SSTs. Click an SST for details.
-                </p>
               </Panel>
 
-              <Panel title="Key-range coverage">
+              <Panel
+                title="Key-range coverage"
+                action={
+                  <HelpTip>
+                    Horizontal position is the key space (rank-scaled).
+                    Translucent overlapping spans in L0 are SSTs a point read
+                    may have to consult — vertical overlap reads as read
+                    amplification.
+                  </HelpTip>
+                }
+              >
                 <KeyRangeView
                   tree={tree}
                   selected={selected}
                   onSelect={setSelected}
                 />
-                <p className="mt-3 text-xs text-ink-5">
-                  Horizontal position is the key space (rank-scaled).
-                  Translucent overlapping spans in L0 are SSTs a point read may
-                  have to consult — vertical overlap reads as read
-                  amplification.
-                </p>
               </Panel>
             </div>
           )

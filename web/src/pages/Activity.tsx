@@ -7,6 +7,7 @@ import {
   useDbPath,
 } from '../api/client'
 import type { ActivityDto, VersionedCompactionsDto } from '../api/types'
+import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { StatusBadge } from '../components/StatusBadge'
@@ -285,7 +286,17 @@ export default function Activity() {
             const rows =
               selected.size === 0 ? all : all.filter((r) => selected.has(r.kind))
             return (
-              <Panel>
+              <Panel
+                action={
+                  <HelpTip>
+                    Newest first. Runs of consecutive flushes are grouped into
+                    one entry; every entry links to its manifest diff.
+                    In-flight compactions appear in the strip above the feed,
+                    failed ones in the feed; completed compactions show as
+                    transitions.
+                  </HelpTip>
+                }
+              >
                 {all.length > 0 && (
                   <FilterBar
                     counts={counts}
@@ -349,17 +360,11 @@ export default function Activity() {
                     })}
                   </ol>
                 )}
-                <p className="mt-3 text-xs text-ink-5">
-                  {selected.size > 0 && (
-                    <>
-                      Showing {rows.length} of {all.length} events.{' '}
-                    </>
-                  )}
-                  Newest first. Runs of consecutive flushes are grouped into one
-                  entry; every entry links to its manifest diff. In-flight
-                  compactions appear in the strip above, failed ones in the
-                  feed; completed compactions show as transitions.
-                </p>
+                {selected.size > 0 && (
+                  <p className="mt-3 text-xs text-ink-5">
+                    Showing {rows.length} of {all.length} events.
+                  </p>
+                )}
               </Panel>
             )
           }}

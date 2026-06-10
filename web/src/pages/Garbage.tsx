@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useActivity, useDbPath, useGarbage } from '../api/client'
 import type { GarbageDto } from '../api/types'
 import { GarbagePanel } from '../components/GarbagePanel'
+import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { classify } from '../lib/feed'
@@ -82,12 +83,6 @@ function Pinners({ g }: { g: GarbageDto }) {
         </tbody>
       </table>
       </div>
-      <div className="mt-3 text-xs text-ink-5">
-        "Keeps alive" counts data objects referenced only via the checkpoint's
-        manifest; checkpoints sharing a manifest report the same objects, so
-        the column is not a disjoint sum. Releasing a checkpoint makes its
-        objects reclaimable on the next GC sweep.
-      </div>
     </>
   )
 }
@@ -161,7 +156,18 @@ export default function Garbage() {
         >
           <RecentSweeps />
         </Panel>
-        <Panel title="Checkpoints pinning storage">
+        <Panel
+          title="Checkpoints pinning storage"
+          action={
+            <HelpTip>
+              "Keeps alive" counts data objects referenced only via the
+              checkpoint's manifest; checkpoints sharing a manifest report
+              the same objects, so the column is not a disjoint sum.
+              Releasing a checkpoint makes its objects reclaimable on the
+              next GC sweep.
+            </HelpTip>
+          }
+        >
           <QueryGate query={query}>{(g) => <Pinners g={g} />}</QueryGate>
         </Panel>
       </div>
