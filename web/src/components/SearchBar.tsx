@@ -27,6 +27,30 @@ export function SearchBar({ dbId }: { dbId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<SearchDto | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // "/" (when not typing elsewhere) and Cmd/Ctrl-K focus the search box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing =
+        target !== null &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      const cmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+      const slash =
+        e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey
+      if (cmdK || slash) {
+        e.preventDefault()
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Reset when switching DBs — results belong to one DB.
   useEffect(() => {
@@ -82,12 +106,16 @@ export function SearchBar({ dbId }: { dbId: string }) {
     <div ref={rootRef} className="relative hidden w-full max-w-sm md:block">
       <form onSubmit={submit}>
         <input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search ULID / checkpoint UUID…"
           spellCheck={false}
-          className="w-full rounded-md border border-ink-6 bg-surface-0 px-3 py-1.5 font-mono text-xs text-ink-2 placeholder:font-sans placeholder:text-ink-5 focus:border-ink-4 focus:outline-none"
+          className="w-full rounded-md border border-ink-6 bg-surface-0 py-1.5 pl-3 pr-8 font-mono text-xs text-ink-2 placeholder:font-sans placeholder:text-ink-5 focus:border-ink-4 focus:outline-none"
         />
+        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-ink-6 bg-surface-1 px-1.5 font-sans text-[10px] text-ink-5">
+          /
+        </kbd>
       </form>
       {open && (
         <div className="absolute left-0 right-0 top-10 z-40 max-h-[70vh] overflow-y-auto rounded-lg border border-ink-7 bg-surface-1 py-1 shadow-lg">
