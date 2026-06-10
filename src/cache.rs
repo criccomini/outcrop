@@ -34,6 +34,15 @@ impl<T> TtlCache<T> {
         *slot = Some((Instant::now(), value.clone()));
         Ok(value)
     }
+
+    /// The cached value regardless of freshness, without fetching; None
+    /// when empty or while a refresh holds the lock.
+    pub fn peek(&self) -> Option<Arc<T>> {
+        self.slot
+            .try_lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|(_, value)| value.clone()))
+    }
 }
 
 /// LRU cache for objects that are immutable once written (manifests by id,

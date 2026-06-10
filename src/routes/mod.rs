@@ -38,6 +38,7 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/checkpoints", get(checkpoints::list))
         .route("/api/clones", get(checkpoints::clones))
         .route("/api/garbage", get(garbage::garbage))
+        .route("/api/garbage/events", get(garbage::gc_events))
         .route("/api/search", get(search::search))
         .with_state(state)
 }

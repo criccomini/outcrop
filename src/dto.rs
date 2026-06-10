@@ -384,6 +384,36 @@ pub struct DbsDto {
     pub dbs: Vec<DbInfoDto>,
 }
 
+/// One object observed to have disappeared from a listing between two
+/// refreshes — almost always a GC deletion.
+#[derive(Serialize, Clone, Debug)]
+pub struct GcEventDto {
+    /// "compacted" | "wal" | "manifest"
+    pub kind: &'static str,
+    /// ULID for compacted SSTs, numeric id for WAL SSTs and manifests.
+    pub id: String,
+    pub size_bytes: u64,
+    pub written_at: DateTime<Utc>,
+    /// Last listing refresh that still saw the object.
+    pub last_seen_at: DateTime<Utc>,
+    /// First listing refresh that no longer saw it.
+    pub missing_at: DateTime<Utc>,
+    /// Whether the latest cached manifest still referenced it when it
+    /// vanished (true = anomaly); absent when no manifest was available
+    /// to judge against.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referenced: Option<bool>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct GcEventsDto {
+    /// Observation starts when this server first listed the DB; sweeps
+    /// before that (or while no dashboard is running) are not recorded.
+    pub observing_since: DateTime<Utc>,
+    /// Newest first, capped.
+    pub events: Vec<GcEventDto>,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct SearchSstObjectDto {
     pub location: String,

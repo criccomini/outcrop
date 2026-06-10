@@ -6,7 +6,7 @@ use axum::Json;
 use slatedb::manifest::{SsTableId, VersionedManifest};
 use ulid::Ulid;
 
-use crate::dto::GarbageDto;
+use crate::dto::{GarbageDto, GcEventsDto};
 use crate::error::ApiError;
 use crate::garbage::{compute_garbage, CheckpointPin, GarbageInputs, ManifestRefs};
 use crate::state::AppState;
@@ -34,6 +34,22 @@ fn manifest_refs(m: &VersionedManifest) -> ManifestRefs {
         replay_after_wal_id: m.replay_after_wal_id(),
         next_wal_sst_id: m.next_wal_sst_id(),
     }
+}
+
+/// Deletions observed by diffing consecutive listing refreshes (the GC
+/// itself leaves no record). Refreshes the listings first so the feed is
+/// as current as a poll can make it.
+pub async fn gc_events(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<GcEventsDto>, ApiError> {
+    state.compacted_entries().await?;
+    state.wal_entries().await?;
+    state.manifest_entries().await?;
+    let obs = state.gc_observer.lock().unwrap();
+    Ok(Json(GcEventsDto {
+        observing_since: obs.started_at(),
+        events: obs.events().cloned().collect(),
+    }))
 }
 
 pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageDto>, ApiError> {

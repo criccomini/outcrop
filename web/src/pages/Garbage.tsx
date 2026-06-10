@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { useActivity, useDbPath, useGarbage } from '../api/client'
-import type { GarbageDto } from '../api/types'
+import { useActivity, useDbPath, useGarbage, useGcEvents } from '../api/client'
+import type { GarbageDto, GcEventDto } from '../api/types'
 import { GarbagePanel } from '../components/GarbagePanel'
 import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
@@ -135,6 +135,100 @@ function RecentSweeps() {
   )
 }
 
+const KIND_LABEL: Record<GcEventDto['kind'], string> = {
+  compacted: 'SST',
+  wal: 'WAL',
+  manifest: 'manifest',
+}
+
+/**
+ * Deletions inferred by the server diffing its own periodic listings —
+ * SlateDB's GC leaves no record of what it removes, so disappearance
+ * between refreshes is the only evidence available.
+ */
+function ObservedDeletions() {
+  const query = useGcEvents()
+  const dbPath = useDbPath()
+  return (
+    <QueryGate query={query}>
+      {(d) => (
+        <>
+          {d.events.length === 0 ? (
+            <span className="text-sm text-ink-5">
+              No deletions observed since{' '}
+              {formatRelative(d.observing_since)} — sweeps only register
+              while this dashboard is running and watching.
+            </span>
+          ) : (
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
+                  <th className="pb-2 pr-4">Deleted</th>
+                  <th className="pb-2 pr-4">Kind</th>
+                  <th className="pb-2 pr-4">Object</th>
+                  <th className="pb-2 pr-4">Size</th>
+                  <th className="pb-2">Age at deletion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.events.map((e) => (
+                  <tr key={`${e.kind}-${e.id}-${e.missing_at}`} className="border-t border-ink-7/50">
+                    <td
+                      className="py-1.5 pr-4 text-ink-3"
+                      title={`last seen ${formatTime(e.last_seen_at)}, gone by ${formatTime(e.missing_at)}`}
+                    >
+                      {formatRelative(e.missing_at)}
+                    </td>
+                    <td className="py-1.5 pr-4">
+                      <span className="rounded-full border border-ink-6 bg-surface-2 px-2 py-0.5 text-xs text-ink-3">
+                        {KIND_LABEL[e.kind]}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-4 font-mono text-xs text-ink-4">
+                      {e.id}
+                      {e.referenced === true && (
+                        <span className="ml-2 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 font-sans text-xs font-medium text-red-800">
+                          was still referenced!
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-4">{formatBytes(e.size_bytes)}</td>
+                    <td className="py-1.5 text-ink-3">
+                      {(() => {
+                        const ms =
+                          Date.parse(e.missing_at) - Date.parse(e.written_at)
+                        const m = Math.round(ms / 60_000)
+                        return m < 60
+                          ? `${m}m`
+                          : m < 1440
+                            ? `${Math.round(m / 60)}h`
+                            : `${Math.round(m / 1440)}d`
+                      })()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-ink-5">
+            Inferred by diffing listings between refreshes (observing since{' '}
+            {formatRelative(d.observing_since)}); in-memory, so restarts
+            clear it.{' '}
+            <Link
+              to={dbPath('/activity?kinds=gc')}
+              className="text-accent hover:text-accent-high"
+            >
+              Checkpoint sweeps →
+            </Link>
+          </p>
+        </>
+      )}
+    </QueryGate>
+  )
+}
+
 export default function Garbage() {
   const query = useGarbage()
   const dbPath = useDbPath()
@@ -143,6 +237,22 @@ export default function Garbage() {
       <h1 className="text-3xl">Garbage Collection</h1>
       <div className="mt-6 space-y-5">
         <GarbagePanel />
+        <Panel
+          title="Observed deletions"
+          action={
+            <HelpTip>
+              What the GC actually removed: the server diffs its periodic
+              object listings and records anything that disappears, with
+              size and age. SlateDB's GC writes no deletion log, so this is
+              observational — it only covers sweeps that happen while the
+              dashboard is running, and restarts clear it. A red flag means
+              an object vanished while the latest manifest still referenced
+              it, which the GC should never do.
+            </HelpTip>
+          }
+        >
+          <ObservedDeletions />
+        </Panel>
         <Panel
           title="Recent GC sweeps"
           action={

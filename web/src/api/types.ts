@@ -372,3 +372,18 @@ export interface SearchDto {
   compactions: SearchCompactionHitDto[]
   checkpoints: SearchCheckpointHitDto[]
 }
+
+export interface GcEventDto {
+  kind: 'compacted' | 'wal' | 'manifest'
+  id: string
+  size_bytes: number
+  written_at: string
+  last_seen_at: string
+  missing_at: string
+  referenced?: boolean
+}
+
+export interface GcEventsDto {
+  observing_since: string
+  events: GcEventDto[]
+}

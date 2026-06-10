@@ -9,6 +9,7 @@ import type {
   DbsDto,
   ExternalDbDto,
   GarbageDto,
+  GcEventsDto,
   HealthDto,
   LsmDto,
   ManifestDiffDto,
@@ -297,6 +298,15 @@ export function useClones() {
   return useQuery<ExternalDbDto[], ApiRequestError>({
     queryKey: [db, 'clones'],
     queryFn: () => fetchJson(`${api(db)}/clones`),
+  })
+}
+
+export function useGcEvents() {
+  const db = useDbId()
+  return useQuery<GcEventsDto, ApiRequestError>({
+    queryKey: [db, 'gc-events'],
+    queryFn: () => fetchJson(`${api(db)}/garbage/events`),
+    meta: { live: true },
   })
 }
 
