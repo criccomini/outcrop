@@ -195,7 +195,8 @@ export default function App() {
   return (
     <div className={`min-h-screen ${collapsed ? 'lg:pl-14' : 'lg:pl-56'}`}>
       {/* Desktop: full-height drawer flush against the left edge,
-          collapsible to an icon rail. */}
+          collapsible to an icon rail. The collapsed width (w-14) matches
+          the header height (h-14) so the top-left corner stays square. */}
       <aside
         className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-ink-7 bg-surface-1 lg:flex ${
           collapsed ? 'w-14' : 'w-56'
@@ -225,16 +226,10 @@ export default function App() {
           />
         </div>
         <div
-          className={`flex h-11 shrink-0 items-center gap-2 border-t border-ink-7 ${
-            collapsed ? 'justify-center' : 'px-4'
+          className={`flex h-11 shrink-0 items-center border-t border-ink-7 ${
+            collapsed ? 'justify-center' : 'justify-end px-3'
           }`}
         >
-          {!collapsed && dbId && (
-            <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-4">
-              {dbId}
-            </span>
-          )}
-          {!collapsed && !dbId && <span className="flex-1" />}
           <button
             onClick={toggleCollapsed}
             className="rounded-md p-1 text-ink-4 hover:bg-surface-2 hover:text-ink-1"
