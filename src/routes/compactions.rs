@@ -13,20 +13,7 @@ use crate::state::AppState;
 pub async fn state(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<CompactorStateDto>, ApiError> {
-    let dto = state
-        .compactor_state
-        .get_with(|| async {
-            let view = state
-                .admin
-                .read_compactor_state_view()
-                .await
-                .map_err(ApiError::from)?;
-            Ok::<_, ApiError>(CompactorStateDto {
-                manifest_id: view.manifest().id(),
-                compactions: view.compactions().map(convert::versioned_compactions_dto),
-            })
-        })
-        .await?;
+    let dto = state.compactor_state_dto().await?;
     Ok(Json((*dto).clone()))
 }
 

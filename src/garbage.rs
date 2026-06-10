@@ -5,8 +5,12 @@
 //! already removed, manifests survive while the latest or a live checkpoint
 //! references them, WAL SSTs survive while any live manifest still needs
 //! them for replay, and compacted SSTs survive while any live manifest's
-//! tree references them. The GC's min-age grace periods are ignored, so
-//! this is the steady-state estimate.
+//! tree references them — or while they sit at/after the GC's compaction
+//! and newest-L0 barriers (`gc_cutoff`): compaction outputs and L0 flushes
+//! land in `compacted/` *before* a manifest references them, and the GC
+//! never deletes in that window, so such SSTs count as live here too. The
+//! GC's min-age grace periods are ignored, so this is the steady-state
+//! estimate.
 
 use std::collections::{HashMap, HashSet};
 
@@ -53,6 +57,11 @@ pub struct GarbageInputs<'a> {
     pub compacted_listing: &'a [CompactedEntry],
     pub wal_listing: &'a [WalEntry],
     pub manifest_listing: &'a [ManifestEntry],
+    /// Compacted SSTs whose ULID timestamp is at/after this instant are
+    /// never deleted by the GC even when unreferenced — they may be
+    /// in-flight compaction outputs or fresh L0s not yet in a manifest.
+    /// Mirror of the GC's compaction-low-watermark and newest-L0 barriers.
+    pub gc_cutoff: DateTime<Utc>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -105,6 +114,11 @@ pub fn compute_garbage(inputs: &GarbageInputs) -> GarbageDto {
             Class::Live
         } else if inputs.pinned.iter().any(|m| m.compacted.contains(&entry.ulid)) {
             Class::Pinned
+        } else if DateTime::<Utc>::from(entry.ulid.datetime()) >= inputs.gc_cutoff {
+            // Unreferenced but inside the GC's no-delete window: almost
+            // certainly an in-flight compaction output or a fresh L0 the
+            // manifest hasn't caught up with. Live, not garbage.
+            Class::Live
         } else {
             note_reclaimable(&mut oldest_reclaimable_at, entry.last_modified);
             Class::Reclaimable
@@ -281,6 +295,7 @@ mod tests {
             ],
             wal_listing: &[],
             manifest_listing: &[],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.compacted.stored_count, 3);
@@ -289,6 +304,35 @@ mod tests {
         assert_eq!(out.compacted.pinned_bytes, 40);
         assert_eq!(out.compacted.reclaimable_bytes, 7);
         assert_eq!(out.oldest_reclaimable_at, Some(ts(800)));
+    }
+
+    #[test]
+    fn unreferenced_ssts_inside_the_gc_window_are_live_not_garbage() {
+        let referenced = ulid(1);
+        let old_orphan = ulid(2);
+        // ULID minted at t=2000s — after the cutoff below, i.e. an output
+        // of a running compaction the manifest doesn't reference yet.
+        let in_flight = Ulid::from_parts(2_000_000, 7);
+        let inputs = GarbageInputs {
+            latest: refs(10, &[referenced], 0, 1),
+            pinned: vec![],
+            pinned_checkpoints: vec![],
+            live_checkpoint_count: 0,
+            expired_checkpoint_count: 0,
+            dangling_checkpoint_count: 0,
+            compacted_listing: &[
+                compacted_entry(referenced, 100, 10),
+                compacted_entry(old_orphan, 7, 5),
+                compacted_entry(in_flight, 50, 2000),
+            ],
+            wal_listing: &[],
+            manifest_listing: &[],
+            gc_cutoff: ts(1_000),
+        };
+        let out = compute_garbage(&inputs);
+        assert_eq!(out.compacted.live_bytes, 150);
+        assert_eq!(out.compacted.reclaimable_bytes, 7);
+        assert_eq!(out.oldest_reclaimable_at, Some(ts(5)));
     }
 
     #[test]
@@ -310,6 +354,7 @@ mod tests {
                 wal_entry(9, 10, 400), // newer than manifest: live
             ],
             manifest_listing: &[],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.wal.live_bytes, 20);
@@ -335,6 +380,7 @@ mod tests {
                 manifest_entry(5, 5, 300),
                 manifest_entry(6, 5, 400), // listing raced a newer write
             ],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.manifests.live_count, 2); // #5 and the newer #6
@@ -360,6 +406,7 @@ mod tests {
             ],
             wal_listing: &[],
             manifest_listing: &[manifest_entry(2, 1_000_000, 100)],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.space_amp, Some(2.0));
@@ -393,6 +440,7 @@ mod tests {
                 wal_entry(7, 10, 100), // live in latest — not extra
             ],
             manifest_listing: &[],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.pinners.len(), 3);
@@ -421,6 +469,7 @@ mod tests {
             compacted_listing: &[],
             wal_listing: &[],
             manifest_listing: &[],
+            gc_cutoff: ts(1_000_000),
         };
         let out = compute_garbage(&inputs);
         assert_eq!(out.space_amp, None);

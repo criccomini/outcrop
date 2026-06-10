@@ -553,6 +553,26 @@ impl AppState {
         }
     }
 
+    /// Compactor state (latest manifest id + compactions file), TTL-cached
+    /// and shared by the compactions and garbage endpoints.
+    pub async fn compactor_state_dto(&self) -> Result<Arc<CompactorStateDto>, ApiError> {
+        self.compactor_state
+            .get_with(|| async {
+                let view = self
+                    .admin
+                    .read_compactor_state_view()
+                    .await
+                    .map_err(ApiError::from)?;
+                Ok::<_, ApiError>(CompactorStateDto {
+                    manifest_id: view.manifest().id(),
+                    compactions: view
+                        .compactions()
+                        .map(crate::convert::versioned_compactions_dto),
+                })
+            })
+            .await
+    }
+
     /// Manifest by id, served from the immutable LRU when possible.
     /// Returns None if the manifest does not exist (e.g. GC'd).
     pub async fn manifest_by_id(

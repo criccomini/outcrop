@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::Json;
+use chrono::{DateTime, Utc};
 use slatedb::manifest::{SsTableId, VersionedManifest};
 use ulid::Ulid;
 
@@ -34,6 +35,56 @@ fn manifest_refs(m: &VersionedManifest) -> ManifestRefs {
         replay_after_wal_id: m.replay_after_wal_id(),
         next_wal_sst_id: m.next_wal_sst_id(),
     }
+}
+
+/// Newest L0 timestamp across the manifest's trees (root + segments),
+/// falling back to the last-compacted L0 view id when a tree's L0 is
+/// empty. Mirrors the GC's `newest_l0_dt`: SSTs newer than this may be L0
+/// flushes the manifest hasn't caught up with, so the GC won't touch them.
+fn newest_l0_dt(m: &VersionedManifest) -> DateTime<Utc> {
+    let tree_dt = |l0: &std::collections::VecDeque<slatedb::manifest::SsTableView>,
+                   last_compacted: Option<Ulid>| {
+        if l0.is_empty() {
+            last_compacted.map(|u| DateTime::<Utc>::from(u.datetime()))
+        } else {
+            l0.iter()
+                .filter_map(|v| match v.sst.id {
+                    SsTableId::Compacted(u) => Some(DateTime::<Utc>::from(u.datetime())),
+                    SsTableId::Wal(_) => None,
+                })
+                .max()
+        }
+    };
+    let mut newest = tree_dt(m.l0(), m.last_compacted_l0_sst_view_id());
+    for seg in m.segments() {
+        newest = newest.max(tree_dt(seg.l0(), seg.last_compacted_l0_sst_view_id()));
+    }
+    newest.unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
+}
+
+/// The instant past which the GC deletes nothing from `compacted/`
+/// regardless of references: the min start time across the compactions
+/// file (in-flight outputs land before the manifest references them; a
+/// missing/empty file disables compaction-state-based deletion entirely),
+/// capped by the newest-L0 barrier.
+async fn gc_cutoff(
+    state: &Arc<AppState>,
+    m: &VersionedManifest,
+) -> Result<DateTime<Utc>, ApiError> {
+    let compactor = state.compactor_state_dto().await?;
+    let watermark = compactor
+        .compactions
+        .as_ref()
+        .map(|vc| {
+            vc.compactions
+                .iter()
+                .filter_map(|c| Ulid::from_string(&c.id).ok())
+                .map(|u| DateTime::<Utc>::from(u.datetime()))
+                .min()
+                .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
+        })
+        .unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
+    Ok(watermark.min(newest_l0_dt(m)))
 }
 
 /// Deletions observed by diffing consecutive listing refreshes (the GC
@@ -92,6 +143,7 @@ pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageD
         }
     }
 
+    let gc_cutoff = gc_cutoff(&state, m).await?;
     let compacted_listing = state.compacted_entries().await?;
     let wal_listing = state.wal_entries().await?;
     let manifest_listing = state.manifest_entries().await?;
@@ -106,5 +158,6 @@ pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageD
         compacted_listing: &compacted_listing,
         wal_listing: &wal_listing,
         manifest_listing: &manifest_listing,
+        gc_cutoff,
     })))
 }
