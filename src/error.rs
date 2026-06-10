@@ -15,7 +15,10 @@ pub enum ApiError {
 
 impl From<slatedb::Error> for ApiError {
     fn from(e: slatedb::Error) -> Self {
-        ApiError::Internal(e.to_string())
+        // The error chain embeds object-store details (server-side paths,
+        // bucket endpoints); log it server-side, don't return it.
+        tracing::debug!("slatedb error: {e}");
+        ApiError::Internal("error reading database state".to_string())
     }
 }
 

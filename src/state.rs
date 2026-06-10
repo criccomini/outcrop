@@ -362,7 +362,10 @@ impl AppState {
                 while let Some(meta) = stream
                     .try_next()
                     .await
-                    .map_err(|e| ApiError::Internal(format!("listing manifests: {e}")))?
+                    .map_err(|e| {
+                        tracing::debug!("listing manifests at '{}': {e}", self.db_path);
+                        ApiError::Internal("error listing manifests".to_string())
+                    })?
                 {
                     let Some(name) = meta.location.filename() else {
                         continue;
@@ -396,7 +399,10 @@ impl AppState {
                 while let Some(meta) = stream
                     .try_next()
                     .await
-                    .map_err(|e| ApiError::Internal(format!("listing wal: {e}")))?
+                    .map_err(|e| {
+                        tracing::debug!("listing wal at '{}': {e}", self.db_path);
+                        ApiError::Internal("error listing wal".to_string())
+                    })?
                 {
                     let Some(name) = meta.location.filename() else {
                         continue;
@@ -431,7 +437,10 @@ impl AppState {
         while let Some(meta) = stream
             .try_next()
             .await
-            .map_err(|e| ApiError::Internal(format!("listing compacted: {e}")))?
+            .map_err(|e| {
+                tracing::debug!("listing compacted at '{}': {e}", self.db_path);
+                ApiError::Internal("error listing compacted SSTs".to_string())
+            })?
         {
             let Some(name) = meta.location.filename() else {
                 continue;
