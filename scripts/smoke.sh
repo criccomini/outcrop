@@ -44,8 +44,9 @@ if [ "$OLDEST" != "$LATEST" ]; then
   db "/manifests/diff?a=$OLDEST&b=$LATEST" | jq -e ".a == $OLDEST and .b == $LATEST" > /dev/null || fail "manifest diff"
 fi
 
-# Drill into the first compacted SST we can find (L0 or any sorted run).
-ULID=$(db /lsm | jq -r '[.tree.l0[].sst_id, .tree.runs[].ssts[].sst_id] | map(select(.kind == "compacted")) | .[0].ulid // empty')
+# Drill into the first compacted SST we can find (L0 or any sorted run,
+# root tree or segments).
+ULID=$(db /lsm | jq -r '[.tree.l0[].sst_id, .tree.runs[].ssts[].sst_id, (.segments[]?.tree | .l0[].sst_id, .runs[].ssts[].sst_id)] | map(select(.kind == "compacted")) | .[0].ulid // empty')
 if [ -n "$ULID" ]; then
   db "/ssts/$ULID" | jq -e '.size_bytes > 0 and (.index.total_blocks >= 1)' > /dev/null || fail "sst detail"
 else
