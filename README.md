@@ -91,6 +91,7 @@ cost stays bounded), `--scan-depth` (default 4) / `--scan-ttl-secs`
 # mode that writes; the dashboard itself never does). Each DB runs at a
 # different rate and phase so the fleet looks heterogeneous.
 cargo run -- traffic                         # --dbs, --rate, --checkpoint-secs
+# add --clean to delete ./demo-data first and start from scratch
 
 # Then watch them (the fleet page lists all three):
 CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run

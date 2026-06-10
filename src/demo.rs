@@ -53,6 +53,10 @@ pub struct TrafficArgs {
     /// Seconds between short-lived checkpoints (0 disables)
     #[arg(long, default_value_t = 120)]
     checkpoint_secs: u64,
+
+    /// Delete the entire --dir first, so the demo starts from scratch
+    #[arg(long)]
+    clean: bool,
 }
 
 // Deterministic pseudo-random stream so runs are reproducible.
@@ -375,6 +379,25 @@ async fn run_one(
 /// rates and phases. Returns once every DB has flushed after Ctrl-C.
 pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
     anyhow::ensure!(args.dbs >= 1, "--dbs must be at least 1");
+    if args.clean {
+        let dir = std::path::Path::new(&args.dir);
+        if dir.exists() {
+            // Small sanity net for a destructive flag: never wipe / or $HOME.
+            let canon = dir.canonicalize()?;
+            anyhow::ensure!(
+                canon != std::path::Path::new("/"),
+                "--clean refuses to delete /"
+            );
+            if let Ok(home) = std::env::var("HOME") {
+                anyhow::ensure!(
+                    canon != std::path::Path::new(&home),
+                    "--clean refuses to delete your home directory"
+                );
+            }
+            std::fs::remove_dir_all(&canon)?;
+            println!("removed {} (--clean)", args.dir);
+        }
+    }
     std::fs::create_dir_all(&args.dir)?;
     let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix(&args.dir)?);
 

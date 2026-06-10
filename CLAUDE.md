@@ -15,7 +15,7 @@ Always commit after making progress (e.g. after each fix or coherent unit of wor
 ```sh
 # Seed demo DBs (demo-db-1..3) if missing, then churn them concurrently
 # until Ctrl-C: varying-rate puts/deletes, embedded compactor + GC enabled
-cargo run -- traffic                # --dbs N to change the fleet size
+cargo run -- traffic                # --dbs N fleet size; --clean wipes ./demo-data first
 
 # Run the server (UI + API on 127.0.0.1:8333; LOCAL_PATH must be absolute).
 # DBs are auto-discovered; there is no --path.
