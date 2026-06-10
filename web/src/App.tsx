@@ -11,7 +11,8 @@ import {
 } from 'react-router-dom'
 import { dbUrl, useDbs, useOverview } from './api/client'
 import { RefreshTimer } from './components/RefreshTimer'
-import { SearchBar } from './components/SearchBar'
+import { MobileSearch, SearchBar } from './components/SearchBar'
+import { ESCAPE_OVERLAY, useEscape } from './lib/escape'
 import { splitDbSplat } from './lib/dbroute'
 import Fleet from './pages/Fleet'
 import Overview from './pages/Overview'
@@ -254,6 +255,8 @@ export default function App() {
       localStorage.setItem('sdb-nav-collapsed', c ? '0' : '1')
       return !c
     })
+  // The nav overlay covers the page; Esc closes it ahead of anything below.
+  useEscape(navOpen, () => setNavOpen(false), ESCAPE_OVERLAY)
   const match = matchPath('/db/:store/*', location.pathname)
   const route = splitDbSplat(match?.params['*'] ?? '')
   const dbId =
@@ -375,6 +378,7 @@ export default function App() {
                 {dbId}
               </span>
             )}
+            {dbId && <MobileSearch dbId={dbId} />}
             <RefreshTimer />
           </div>
         </div>

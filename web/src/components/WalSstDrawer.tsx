@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { useDbId } from '../api/client'
 import type { WalSstDto } from '../api/types'
+import { useEscape } from '../lib/escape'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -39,13 +39,7 @@ export function WalSstDrawer({
   const dbPath = dbId.slice(dbId.indexOf(':') + 1)
   const location = `${dbPath}/wal/${String(entry.id).padStart(20, '0')}.sst`
   const unreplayed = entry.id > replayAfterWalId
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEscape(true, onClose)
   return (
     <aside className="fixed inset-y-0 right-0 z-30 w-full max-w-[26rem] overflow-y-auto border-l border-ink-7 bg-surface-1 p-5 shadow-lg xl:top-14 xl:z-10">
       <div className="flex items-start justify-between gap-2">
