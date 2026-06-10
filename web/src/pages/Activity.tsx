@@ -213,6 +213,15 @@ function FilterBar({
           </button>
         )
       })}
+      {/* On this row (right-aligned) rather than in a panel header above. */}
+      <span className="ml-auto">
+        <HelpTip>
+          Newest first. Runs of consecutive flushes are grouped into one
+          entry; every entry links to its manifest diff. In-flight
+          compactions appear in the strip above the feed, failed ones in the
+          feed; completed compactions show as transitions.
+        </HelpTip>
+      </span>
     </div>
   )
 }
@@ -286,17 +295,7 @@ export default function Activity() {
             const rows =
               selected.size === 0 ? all : all.filter((r) => selected.has(r.kind))
             return (
-              <Panel
-                action={
-                  <HelpTip>
-                    Newest first. Runs of consecutive flushes are grouped into
-                    one entry; every entry links to its manifest diff.
-                    In-flight compactions appear in the strip above the feed,
-                    failed ones in the feed; completed compactions show as
-                    transitions.
-                  </HelpTip>
-                }
-              >
+              <Panel>
                 {all.length > 0 && (
                   <FilterBar
                     counts={counts}
