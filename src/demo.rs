@@ -14,6 +14,7 @@ use slatedb::admin::AdminBuilder;
 use slatedb::config::{CheckpointOptions, PutOptions, Settings, WriteOptions};
 use slatedb::object_store::local::LocalFileSystem;
 use slatedb::object_store::ObjectStore;
+use slatedb::prefix_extractor::{PrefixExtractor, PrefixTarget};
 use slatedb::Db;
 use tokio_util::sync::CancellationToken;
 
@@ -57,6 +58,52 @@ pub struct TrafficArgs {
     /// Delete the entire --dir first, so the demo starts from scratch
     #[arg(long)]
     clean: bool,
+
+    /// Partition keys into N segments (RFC-0024) via a first-'/' prefix
+    /// extractor; keys become "t{seg}/user:{id}". Unset: each DB decides
+    /// randomly (but stably, by name) whether it's segmented, so the fleet
+    /// shows both shapes. 0 forces unsegmented everywhere. The extractor is
+    /// fixed at DB creation, so changes need fresh DBs — pair with --clean
+    #[arg(long)]
+    segments: Option<usize>,
+}
+
+/// Segment count for one DB: the explicit flag, or a stable pseudo-random
+/// per-name choice (~half unsegmented, the rest 2–6 segments). Stability
+/// across restarts matters because a DB's extractor is fixed at creation
+/// and every reopen must make the same choice.
+fn db_segments(args: &TrafficArgs, db_path: &str) -> usize {
+    if let Some(n) = args.segments {
+        return n;
+    }
+    let h = db_path
+        .bytes()
+        .fold(0xcbf29ce484222325u64, |h, b| {
+            (h ^ b as u64).wrapping_mul(0x100000001b3)
+        });
+    if h % 2 == 0 {
+        0
+    } else {
+        2 + ((h >> 8) % 5) as usize
+    }
+}
+
+/// Segments keys at the first '/': "t03/user:00000042" → segment "t03/".
+/// First-delimiter extraction is extension-safe, so Point and Prefix
+/// targets answer identically; keys without a '/' have no segment.
+struct FirstSlashExtractor;
+
+impl PrefixExtractor for FirstSlashExtractor {
+    fn name(&self) -> &str {
+        "first-slash"
+    }
+
+    fn prefix_len(&self, target: &PrefixTarget) -> Option<usize> {
+        let bytes = match target {
+            PrefixTarget::Point(b) | PrefixTarget::Prefix(b) => b,
+        };
+        bytes.iter().position(|&c| c == b'/').map(|i| i + 1)
+    }
 }
 
 // Deterministic pseudo-random stream so runs are reproducible.
@@ -72,7 +119,28 @@ impl Lcg {
     }
 }
 
-async fn open_seed_db(path: &str, store: Arc<dyn ObjectStore>) -> anyhow::Result<Db> {
+/// Key for logical id `k`: plain, or segment-prefixed when --segments is on.
+fn key_for(segments: usize, k: u64) -> String {
+    if segments == 0 {
+        format!("user:{k:08}")
+    } else {
+        format!("t{:02}/user:{k:08}", k % segments as u64)
+    }
+}
+
+fn apply_segments(builder: slatedb::DbBuilder<String>, segments: usize) -> slatedb::DbBuilder<String> {
+    if segments == 0 {
+        builder
+    } else {
+        builder.with_segment_extractor(Arc::new(FirstSlashExtractor))
+    }
+}
+
+async fn open_seed_db(
+    path: &str,
+    segments: usize,
+    store: Arc<dyn ObjectStore>,
+) -> anyhow::Result<Db> {
     let settings = Settings {
         // Small L0 SSTs so a modest amount of data produces a real tree.
         l0_sst_size_bytes: 128 * 1024,
@@ -94,13 +162,15 @@ async fn open_seed_db(path: &str, store: Arc<dyn ObjectStore>) -> anyhow::Result
         l0_max_ssts_per_key: 256,
         ..Settings::default()
     };
-    Ok(Db::builder(path.to_string(), store)
-        .with_settings(settings)
-        .build()
-        .await?)
+    let builder = Db::builder(path.to_string(), store).with_settings(settings);
+    Ok(apply_segments(builder, segments).build().await?)
 }
 
-async fn open_traffic_db(path: &str, store: Arc<dyn ObjectStore>) -> anyhow::Result<Db> {
+async fn open_traffic_db(
+    path: &str,
+    segments: usize,
+    store: Arc<dyn ObjectStore>,
+) -> anyhow::Result<Db> {
     let settings = Settings {
         // Small L0 SSTs so the tree visibly evolves within seconds, and
         // bloom filters on every SST. Unlike the seed phase, keep the
@@ -115,16 +185,15 @@ async fn open_traffic_db(path: &str, store: Arc<dyn ObjectStore>) -> anyhow::Res
         flush_interval: Some(Duration::from_secs(1)),
         ..Settings::default()
     };
-    Ok(Db::builder(path.to_string(), store)
-        .with_settings(settings)
-        .build()
-        .await?)
+    let builder = Db::builder(path.to_string(), store).with_settings(settings);
+    Ok(apply_segments(builder, segments).build().await?)
 }
 
 async fn write_waves(
     db: &Db,
     tag: &str,
     waves: std::ops::Range<usize>,
+    segments: usize,
     args: &TrafficArgs,
     rng: &mut Lcg,
     written: &mut u64,
@@ -141,7 +210,7 @@ async fn write_waves(
     for wave in waves {
         for _ in 0..args.keys_per_wave {
             let k = rng.next() % key_space;
-            let key = format!("user:{k:08}");
+            let key = key_for(segments, k);
             if rng.next() % 10 == 0 && *written > 0 {
                 db.delete_with_options(&key, &write_opts).await?;
                 *deleted += 1;
@@ -187,6 +256,7 @@ async fn create_checkpoint(
 async fn seed_base(
     args: &TrafficArgs,
     db_path: &str,
+    segments: usize,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<()> {
     let mut rng = Lcg(42);
@@ -200,8 +270,8 @@ async fn seed_base(
     );
 
     // Phase 1: bulk of the data, then a named checkpoint.
-    let db = open_seed_db(db_path, store.clone()).await?;
-    write_waves(&db, db_path, 0..phase1_waves, args, &mut rng, &mut written, &mut deleted)
+    let db = open_seed_db(db_path, segments, store.clone()).await?;
+    write_waves(&db, db_path, 0..phase1_waves, segments, args, &mut rng, &mut written, &mut deleted)
         .await?;
     db.close().await?;
     create_checkpoint(
@@ -232,11 +302,12 @@ async fn seed_base(
 
     // Phase 3: reopen (bumps writer epoch) and leave fresh L0 SSTs stacked
     // on top of the sorted runs.
-    let db = open_seed_db(db_path, store.clone()).await?;
+    let db = open_seed_db(db_path, segments, store.clone()).await?;
     write_waves(
         &db,
         db_path,
         phase1_waves..args.waves,
+        segments,
         args,
         &mut rng,
         &mut written,
@@ -273,18 +344,28 @@ async fn run_one(
     store: Arc<dyn ObjectStore>,
     token: CancellationToken,
 ) -> anyhow::Result<()> {
+    let segments = db_segments(&args, &db_path);
+    println!(
+        "[{db_path}] {}",
+        if segments == 0 {
+            "unsegmented".to_string()
+        } else {
+            format!("segmented into {segments} (t00/..t{:02}/)", segments - 1)
+        }
+    );
+
     let db_dir = std::path::Path::new(&args.dir).join(&db_path);
     if db_dir.exists() {
         println!("[{db_path}] found existing demo DB — skipping seed");
     } else {
-        seed_base(&args, &db_path, store.clone()).await?;
+        seed_base(&args, &db_path, segments, store.clone()).await?;
     }
 
     let rate = (args.rate as f64) * RATE_FACTORS[idx % RATE_FACTORS.len()];
     // Stagger the sine phase per DB so the fleet doesn't move in lockstep.
     let phase_offset = (idx as f64) * 60.0;
 
-    let db = open_traffic_db(&db_path, store.clone()).await?;
+    let db = open_traffic_db(&db_path, segments, store.clone()).await?;
     // The seed wrote dense keys [0, seeded); traffic inserts scatter from
     // index `seeded` upward so they never collide with each other.
     let seeded = (args.waves * args.keys_per_wave) as u64;
@@ -335,7 +416,7 @@ async fn run_one(
             if roll == 0 && puts > 0 {
                 // 10% deletes of a random existing key.
                 let k = existing(rng.next(), inserted);
-                db.delete_with_options(format!("user:{k:08}"), &write_opts)
+                db.delete_with_options(key_for(segments, k), &write_opts)
                     .await?;
                 deletes += 1;
             } else {
@@ -346,7 +427,7 @@ async fn run_one(
                 } else {
                     existing(rng.next(), inserted)
                 };
-                let key = format!("user:{k:08}");
+                let key = key_for(segments, k);
                 let len = 64 + (rng.next() % 512) as usize;
                 let value = format!("t:{key}:")
                     .into_bytes()

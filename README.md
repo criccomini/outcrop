@@ -89,8 +89,9 @@ cost stays bounded), `--scan-depth` (default 4) / `--scan-ttl-secs`
 # Seed three demo DBs into ./demo-data if missing, then simulate live
 # traffic against all of them concurrently until Ctrl-C (this is the only
 # mode that writes; the dashboard itself never does). Each DB runs at a
-# different rate and phase so the fleet looks heterogeneous.
-cargo run -- traffic                         # --dbs, --rate, --checkpoint-secs
+# different rate and phase, and randomly (but stably, by name) decides
+# whether it's segmented (RFC-0024) so the fleet shows both shapes.
+cargo run -- traffic              # --dbs, --rate, --checkpoint-secs, --segments
 # add --clean to delete ./demo-data first and start from scratch
 
 # Then watch them (the fleet page lists all three):
