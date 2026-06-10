@@ -1,13 +1,12 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useDbPath, useManifest } from '../api/client'
 import { JsonTree } from '../components/JsonTree'
 import { Panel, Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes } from '../lib/format'
 
-export default function ManifestDetail() {
-  const { id } = useParams<{ id: string }>()
-  const query = useManifest(id ?? 'latest')
+export default function ManifestDetail({ id }: { id: string }) {
+  const query = useManifest(id)
   const dbPath = useDbPath()
 
   return (

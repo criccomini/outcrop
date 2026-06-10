@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import {
   matchPath,
+  Navigate,
   NavLink,
   Route,
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from 'react-router-dom'
-import { useDbs, useOverview } from './api/client'
+import { dbUrl, useDbs, useOverview } from './api/client'
 import { RefreshTimer } from './components/RefreshTimer'
+import { splitDbSplat } from './lib/dbroute'
 import Fleet from './pages/Fleet'
 import Overview from './pages/Overview'
 import Alerts from './pages/Alerts'
@@ -68,6 +71,50 @@ function NavIcon({ name }: { name: IconName }) {
   )
 }
 
+/**
+ * /db/{store}/{path…}/{page}: the DB path may contain slashes, so the page
+ * is parsed from the splat's tail rather than matched by static routes.
+ * /db/{store} (no DB path) lists that store's databases.
+ */
+function DbArea() {
+  const params = useParams()
+  const store = params.store ?? ''
+  const splat = params['*'] ?? ''
+  // Old-style /db/store:path URLs redirect to the slash form.
+  if (store.includes(':')) {
+    const [s, ...rest] = store.split(':')
+    return (
+      <Navigate to={`/db/${s}/${rest.join(':')}${splat ? `/${splat}` : ''}`} replace />
+    )
+  }
+  const { path, page, arg } = splitDbSplat(splat)
+  if (path === '') return <Fleet store={store} />
+  switch (page) {
+    case 'alerts':
+      return <Alerts />
+    case 'activity':
+      return <Activity />
+    case 'lsm':
+      return <Lsm />
+    case 'wal':
+      return <Wal />
+    case 'manifests':
+      return <Manifests />
+    case 'manifests/diff':
+      return <ManifestDiff />
+    case 'manifests/id':
+      return <ManifestDetail id={arg ?? ''} />
+    case 'compactions':
+      return <Compactions />
+    case 'checkpoints':
+      return <Checkpoints />
+    case 'garbage':
+      return <Garbage />
+    default:
+      return <Overview />
+  }
+}
+
 const NAV_LINK_STYLE = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2.5 rounded-md px-3 py-2 transition-colors ${
     isActive
@@ -123,7 +170,7 @@ function SidebarNav({
             <select
               value={dbId}
               onChange={(e) => {
-                navigate(`/db/${encodeURIComponent(e.target.value)}${subPath}`)
+                navigate(dbUrl(e.target.value, subPath))
                 onNavigate?.()
               }}
               className="mt-2 w-full rounded-md border border-ink-6 bg-surface-1 px-2 py-1.5 text-sm text-ink-2"
@@ -140,7 +187,7 @@ function SidebarNav({
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
-                to={`/db/${encodeURIComponent(dbId)}${item.to}`}
+                to={dbUrl(dbId, item.to)}
                 end={item.to === ''}
                 onClick={onNavigate}
                 className={linkStyle}
@@ -182,9 +229,17 @@ export default function App() {
       localStorage.setItem('sdb-nav-collapsed', c ? '0' : '1')
       return !c
     })
-  const match = matchPath('/db/:dbId/*', location.pathname)
-  const dbId = match?.params.dbId ? decodeURIComponent(match.params.dbId) : null
-  const subPath = match?.params['*'] ? `/${match.params['*']}` : ''
+  const match = matchPath('/db/:store/*', location.pathname)
+  const route = splitDbSplat(match?.params['*'] ?? '')
+  const dbId =
+    match?.params.store && route.path !== ''
+      ? `${match.params.store}:${route.path}`
+      : null
+  // Where the DB switcher lands: same page on the new DB, except a
+  // manifest-id deep link (ids don't transfer across DBs) drops to the
+  // manifests list.
+  const subPath =
+    route.page === '' ? '' : route.page === 'manifests/id' ? '/manifests' : `/${route.page}`
   // Info-level notes don't warrant a badge; warn/error do. Disabled on the
   // fleet page (no active DB).
   const overview = useOverview(dbId ?? undefined)
@@ -193,17 +248,24 @@ export default function App() {
       ? 0
       : (overview.data?.warnings.filter((w) => w.severity !== 'info').length ?? 0)
   return (
-    <div className={`min-h-screen ${collapsed ? 'lg:pl-14' : 'lg:pl-56'}`}>
+    <div
+      className={`min-h-screen transition-[padding-left] duration-200 ease-in-out ${
+        collapsed ? 'lg:pl-14' : 'lg:pl-56'
+      }`}
+    >
       {/* Desktop: full-height drawer flush against the left edge,
           collapsible to an icon rail. The collapsed width (w-14) matches
           the header height (h-14) so the top-left corner stays square. */}
+      {/* The divider lines are box-shadows OUTSIDE the boxes, so the rail
+          is a true w-14 (56px) and the header a true h-14 — measurably
+          identical, with the lines meeting at a point in the corner. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-ink-7 bg-surface-1 lg:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden bg-surface-1 shadow-[1px_0_0_0_var(--color-ink-7)] transition-[width] duration-200 ease-in-out lg:flex ${
           collapsed ? 'w-14' : 'w-56'
         }`}
       >
         <div
-          className={`flex h-14 shrink-0 items-center border-b border-ink-7 ${
+          className={`flex h-14 shrink-0 items-center shadow-[0_1px_0_0_var(--color-ink-7)] ${
             collapsed ? 'justify-center' : 'px-4'
           }`}
         >
@@ -256,11 +318,11 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Styled identically to the sidebar's logo row — h-14 with the
-          border INSIDE the box, surface-1, ink-7 — so the two read as one
+      {/* Styled identically to the sidebar's logo row — a true h-14 box
+          with the divider as an outside shadow — so the two read as one
           continuous, aligned bar. */}
       <header className="sticky top-0 z-20">
-        <div className="flex h-14 items-center gap-3 border-b border-ink-7 bg-surface-1 px-4">
+        <div className="flex h-14 items-center gap-3 bg-surface-1 px-4 shadow-[0_1px_0_0_var(--color-ink-7)]">
           <button
             onClick={() => setNavOpen(true)}
             className="rounded-md p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink-1 lg:hidden"
@@ -327,19 +389,7 @@ export default function App() {
       <main className="mx-auto min-w-0 max-w-6xl px-4 py-8">
         <Routes>
           <Route path="/" element={<Fleet />} />
-          <Route path="/db/:dbId">
-            <Route index element={<Overview />} />
-            <Route path="alerts" element={<Alerts />} />
-            <Route path="activity" element={<Activity />} />
-            <Route path="lsm" element={<Lsm />} />
-            <Route path="wal" element={<Wal />} />
-            <Route path="manifests" element={<Manifests />} />
-            <Route path="manifests/diff" element={<ManifestDiff />} />
-            <Route path="manifests/:id" element={<ManifestDetail />} />
-            <Route path="compactions" element={<Compactions />} />
-            <Route path="checkpoints" element={<Checkpoints />} />
-            <Route path="garbage" element={<Garbage />} />
-          </Route>
+          <Route path="/db/:store/*" element={<DbArea />} />
         </Routes>
       </main>
     </div>

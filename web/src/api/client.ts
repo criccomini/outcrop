@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
+import { splitDbSplat } from '../lib/dbroute'
 import type {
   ActivityDto,
   CheckpointStatusDto,
@@ -97,19 +98,30 @@ export function refreshLiveNow(queryClient: QueryClient): void {
 }
 
 /**
- * The active DB id from the /db/:dbId route (react-router decodes the
- * segment). Hooks accept an explicit id so pages outside that route (the
- * fleet view) can query any DB.
+ * The active DB id ("store:path") from the /db/{store}/{path…} route.
+ * Hooks accept an explicit id so pages outside that route (the fleet
+ * view) can query any DB.
  */
 export function useDbId(explicit?: string): string {
   const params = useParams()
-  return explicit ?? params.dbId ?? ''
+  if (explicit !== undefined) return explicit
+  const store = params.store
+  if (!store) return ''
+  const { path } = splitDbSplat(params['*'] ?? '')
+  return path === '' ? '' : `${store}:${path}`
 }
 
-/** Prefixes an app route with the active DB: '/lsm' → '/db/{id}/lsm'. */
+/** App route for a DB id: ('s:p', '/lsm') → '/db/s/p/lsm'. */
+export function dbUrl(id: string, path = ''): string {
+  const i = id.indexOf(':')
+  const [store, dbPath] = i === -1 ? [id, ''] : [id.slice(0, i), id.slice(i + 1)]
+  return `/db/${store}/${dbPath}${path}`
+}
+
+/** Prefixes an app route with the active DB: '/lsm' → '/db/{store}/{path}/lsm'. */
 export function useDbPath(): (path: string) => string {
   const db = useDbId()
-  return (path: string) => `/db/${encodeURIComponent(db)}${path}`
+  return (path: string) => dbUrl(db, path)
 }
 
 function api(db: string): string {
