@@ -35,6 +35,10 @@ struct Args {
     /// Seconds to run the compactor between the write phases (0 to skip)
     #[arg(long, default_value_t = 10)]
     compact_secs: u64,
+
+    /// Seed on top of an existing demo DB instead of refusing
+    #[arg(long)]
+    force: bool,
 }
 
 // Deterministic pseudo-random stream so runs are reproducible.
@@ -54,6 +58,19 @@ async fn open_db(args: &Args, store: Arc<dyn ObjectStore>) -> anyhow::Result<Db>
     let settings = Settings {
         // Small L0 SSTs so a modest amount of data produces a real tree.
         l0_sst_size_bytes: 128 * 1024,
+        // The default Db runs an embedded compactor and GC. Disable both:
+        // compaction here is run explicitly between the write phases, so the
+        // final LSM shape (fresh L0 SSTs on top of sorted runs) is
+        // deterministic instead of racing the embedded compactor, and
+        // close() doesn't have to wind down mid-flight background work.
+        compactor_options: None,
+        garbage_collector_options: None,
+        // With no compactor draining L0, the default cap (l0_max_ssts: 8)
+        // would stall flushes — including the final flush inside close() —
+        // as soon as L0 fills, hanging the seeder. Lift it well above what
+        // the write phases can produce.
+        l0_max_ssts: 256,
+        l0_max_ssts_per_key: 256,
         ..Settings::default()
     };
     Ok(Db::builder(args.path.clone(), store)
@@ -124,7 +141,25 @@ async fn create_checkpoint(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Surface slatedb's internal logs (flush/close/GC progress); raise with
+    // e.g. RUST_LOG=slatedb=debug when diagnosing.
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "slatedb=info".into()),
+        )
+        .init();
+
     let args = Args::parse();
+
+    let db_dir = std::path::Path::new(&args.dir).join(&args.path);
+    if db_dir.exists() && !args.force {
+        anyhow::bail!(
+            "{} already contains a demo DB; remove it first (rm -rf {}) or pass --force to seed on top of it",
+            db_dir.display(),
+            args.dir
+        );
+    }
 
     std::fs::create_dir_all(&args.dir)?;
     let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix(&args.dir)?);
@@ -151,8 +186,10 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    // Phase 2: compact phase-1 L0 into sorted runs. The writer must be
-    // closed first — an in-process compactor fences an open writer.
+    // Phase 2: compact phase-1 L0 into sorted runs. Run between the write
+    // phases so phase 3's L0 SSTs survive; the writer is closed first since
+    // a second compactor would fence an open Db's embedded one (and with it
+    // the whole Db handle).
     if args.compact_secs > 0 {
         println!("running compactor for {}s ...", args.compact_secs);
         let admin = AdminBuilder::new(args.path.clone(), store.clone()).build();
