@@ -26,9 +26,8 @@ export default function App() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-ink-7 bg-surface-0/85 shadow-sm backdrop-blur-md backdrop-saturate-150">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
-          <a href="/" className="flex items-center gap-2">
+          <a href="/" className="flex items-center">
             <img src="/img/logo-full.svg" alt="SlateDB" className="h-7" />
-            <span className="font-serif text-lg text-ink-1">Dashboard</span>
           </a>
           <nav className="flex items-center gap-1 text-sm font-medium">
             {NAV.map((item) => (

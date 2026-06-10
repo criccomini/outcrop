@@ -142,6 +142,7 @@ export function useCompactions(limit = 20) {
   return useQuery<VersionedCompactionsDto[], ApiRequestError>({
     queryKey: ['compactions', limit],
     queryFn: () => fetchJson(`/api/compactions?limit=${limit}`),
+    refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
