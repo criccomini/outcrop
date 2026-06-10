@@ -384,6 +384,52 @@ pub struct DbsDto {
     pub dbs: Vec<DbInfoDto>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct SearchSstObjectDto {
+    pub location: String,
+    pub size_bytes: u64,
+    pub last_modified: DateTime<Utc>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SearchManifestHitDto {
+    pub id: u64,
+    /// Where in the tree the ULID matched, e.g. "SST in SR 3" or
+    /// "L0 view id".
+    pub places: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SearchCompactionHitDto {
+    /// Newest .compactions version containing this hit.
+    pub version: u64,
+    pub job_id: String,
+    /// "job" (the ULID is the job id) or "output" (an output SST).
+    pub role: &'static str,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SearchCheckpointHitDto {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub manifest_id: u64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SearchDto {
+    pub query: String,
+    /// The compacted SST object itself, when it exists in the store.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sst_object: Option<SearchSstObjectDto>,
+    /// Manifests referencing the ULID, newest first (capped).
+    pub manifests: Vec<SearchManifestHitDto>,
+    pub manifests_scanned: usize,
+    pub manifests_total: usize,
+    pub compactions: Vec<SearchCompactionHitDto>,
+    pub checkpoints: Vec<SearchCheckpointHitDto>,
+}
+
 /// Per-directory breakdown of stored objects: live (referenced by the latest
 /// manifest), pinned (kept alive only by an unexpired checkpoint), and
 /// reclaimable (what the GC would eventually delete).

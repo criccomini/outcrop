@@ -7,6 +7,7 @@ mod lsm;
 mod manifests;
 mod metrics;
 mod overview;
+mod search;
 mod ssts;
 mod wal;
 
@@ -37,6 +38,7 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/checkpoints", get(checkpoints::list))
         .route("/api/clones", get(checkpoints::clones))
         .route("/api/garbage", get(garbage::garbage))
+        .route("/api/search", get(search::search))
         .with_state(state)
 }
 

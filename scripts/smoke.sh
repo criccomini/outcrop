@@ -59,6 +59,12 @@ db /checkpoints | jq -e 'type == "array"' > /dev/null || fail "checkpoints"
 db /clones | jq -e 'type == "array"' > /dev/null || fail "clones"
 db /garbage | jq -e '.stored_bytes >= 0 and (.compacted.stored_count >= 0) and (.stored_bytes == .live_bytes + .pinned_bytes + .reclaimable_bytes)' > /dev/null || fail "garbage invariants"
 
+# Search round-trip: any compacted SST should find its object + references.
+SULID=$(db /lsm | jq -r '[.tree.l0[].sst_id, .tree.runs[].ssts[].sst_id, (.segments[]?.tree | .l0[].sst_id, .runs[].ssts[].sst_id)] | map(select(.kind == "compacted")) | .[0].ulid // empty')
+if [ -n "$SULID" ]; then
+  db "/search?q=$SULID" | jq -e '.sst_object != null and (.manifests | length) >= 1' > /dev/null || fail "search"
+fi
+
 # Unknown DB ids must 404.
 STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/dbs/nope%3Amissing/overview")
 [ "$STATUS" = "404" ] || fail "unknown db 404 (got $STATUS)"

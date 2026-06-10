@@ -16,6 +16,7 @@ import type {
   ManifestIdDto,
   ManifestSummaryDto,
   OverviewDto,
+  SearchDto,
   SstDetailDto,
   VersionedCompactionsDto,
   WalDto,
@@ -141,6 +142,11 @@ export function useDbs() {
     queryFn: () => fetchJson('/api/dbs'),
     meta: { live: true },
   })
+}
+
+/** One-shot ULID/UUID search against a DB (invoked imperatively). */
+export function fetchSearch(db: string, q: string): Promise<SearchDto> {
+  return fetchJson(`${api(db)}/search?q=${encodeURIComponent(q)}`)
 }
 
 /** Forces a discovery rescan, then refreshes the cached list. */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLsm, useManifestIds } from '../api/client'
 import { HelpTip } from '../components/HelpTip'
@@ -16,12 +16,21 @@ export default function Lsm() {
   const manifestId = rawId !== null ? Number(rawId) : undefined
   const query = useLsm(manifestId)
   const ids = useManifestIds()
-  const [selected, setSelected] = useState<string | null>(null)
+  // ?sst=ULID (e.g. from search results) opens the drawer on load.
+  const [selected, setSelected] = useState<string | null>(() =>
+    params.get('sst'),
+  )
   const [segmentIdx, setSegmentIdx] = useState<number>(-1)
 
   // A different manifest may have different segments, and its SSTs may since
   // have been GC'd — reset the drill-down state when the view target moves.
+  // Not on mount, though: that would clobber a ?sst= deep link.
+  const mounted = useRef(false)
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
     setSelected(null)
     setSegmentIdx(-1)
   }, [manifestId])

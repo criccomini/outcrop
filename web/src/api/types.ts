@@ -339,3 +339,36 @@ export interface GarbageDto {
   space_amp?: number
   oldest_reclaimable_at?: string
 }
+
+export interface SearchSstObjectDto {
+  location: string
+  size_bytes: number
+  last_modified: string
+}
+
+export interface SearchManifestHitDto {
+  id: number
+  places: string[]
+}
+
+export interface SearchCompactionHitDto {
+  version: number
+  job_id: string
+  role: 'job' | 'output'
+}
+
+export interface SearchCheckpointHitDto {
+  id: string
+  name?: string
+  manifest_id: number
+}
+
+export interface SearchDto {
+  query: string
+  sst_object?: SearchSstObjectDto
+  manifests: SearchManifestHitDto[]
+  manifests_scanned: number
+  manifests_total: number
+  compactions: SearchCompactionHitDto[]
+  checkpoints: SearchCheckpointHitDto[]
+}

@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom'
 import { dbUrl, useDbs, useOverview } from './api/client'
 import { RefreshTimer } from './components/RefreshTimer'
+import { SearchBar } from './components/SearchBar'
 import { splitDbSplat } from './lib/dbroute'
 import Fleet from './pages/Fleet'
 import Overview from './pages/Overview'
@@ -367,6 +368,7 @@ export default function App() {
           <a href="/" className="flex items-center lg:hidden">
             <img src="/img/logo-full.svg" alt="SlateDB" className="h-7" />
           </a>
+          {dbId && <SearchBar dbId={dbId} />}
           <div className="ml-auto flex items-center gap-3">
             {dbId && (
               <span className="hidden font-mono text-xs text-ink-4 md:inline lg:hidden">
