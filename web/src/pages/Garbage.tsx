@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useActivity, useGarbage } from '../api/client'
+import { useActivity, useDbPath, useGarbage } from '../api/client'
 import type { GarbageDto } from '../api/types'
 import { GarbagePanel } from '../components/GarbagePanel'
 import { Panel } from '../components/Panel'
@@ -8,6 +8,7 @@ import { classify } from '../lib/feed'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
 function Pinners({ g }: { g: GarbageDto }) {
+  const dbPath = useDbPath()
   if (g.pinners.length === 0) {
     return (
       <span className="text-sm text-ink-5">
@@ -43,7 +44,7 @@ function Pinners({ g }: { g: GarbageDto }) {
               <td className="py-1.5 pr-2">
                 {p.manifest_available ? (
                   <Link
-                    to={`/manifests/${p.manifest_id}`}
+                    to={dbPath(`/manifests/${p.manifest_id}`)}
                     className="font-mono text-xs text-accent hover:text-accent-high"
                   >
                     #{p.manifest_id}
@@ -93,6 +94,7 @@ function Pinners({ g }: { g: GarbageDto }) {
 
 function RecentSweeps() {
   const query = useActivity(50)
+  const dbPath = useDbPath()
   return (
     <QueryGate query={query}>
       {(items) => {
@@ -124,7 +126,7 @@ function RecentSweeps() {
                 </span>
                 <span className="min-w-0 text-sm text-ink-2">{c.text}</span>
                 <Link
-                  to={`/manifests/diff?a=${it.a}&b=${it.b}`}
+                  to={dbPath(`/manifests/diff?a=${it.a}&b=${it.b}`)}
                   className="ml-auto shrink-0 font-mono text-xs text-accent hover:text-accent-high"
                 >
                   #{it.a} → #{it.b}
@@ -140,6 +142,7 @@ function RecentSweeps() {
 
 export default function Garbage() {
   const query = useGarbage()
+  const dbPath = useDbPath()
   return (
     <div>
       <h1 className="text-3xl">Garbage Collection</h1>
@@ -149,7 +152,7 @@ export default function Garbage() {
           title="Recent GC sweeps"
           action={
             <Link
-              to="/activity?kinds=gc"
+              to={dbPath('/activity?kinds=gc')}
               className="text-xs text-accent hover:text-accent-high"
             >
               view in activity →

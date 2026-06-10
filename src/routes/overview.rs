@@ -6,18 +6,10 @@ use axum::Json;
 use slatedb::seq_tracker::FindOption;
 
 use crate::convert;
-use crate::dto::{HealthDto, OverviewDto};
+use crate::dto::OverviewDto;
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::warnings::{compute_warnings, WarningInputs};
-
-pub async fn health(State(state): State<Arc<AppState>>) -> Json<HealthDto> {
-    Json(HealthDto {
-        status: "ok",
-        db_path: state.db_path.clone(),
-        provider: state.provider.clone(),
-    })
-}
 
 pub async fn overview(
     State(state): State<Arc<AppState>>,

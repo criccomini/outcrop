@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useManifests } from '../api/client'
+import { useDbPath, useManifests } from '../api/client'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative } from '../lib/format'
@@ -8,6 +8,7 @@ import { formatBytes, formatRelative } from '../lib/format'
 export default function Manifests() {
   const query = useManifests()
   const navigate = useNavigate()
+  const dbPath = useDbPath()
   // In pick order, capped at two: a third pick replaces the oldest one.
   const [picked, setPicked] = useState<number[]>([])
   // The diff itself is always oldest → newest.
@@ -25,7 +26,7 @@ export default function Manifests() {
         <h1 className="text-3xl">Manifests</h1>
         <button
           disabled={picked.length !== 2}
-          onClick={() => navigate(`/manifests/diff?a=${a}&b=${b}`)}
+          onClick={() => navigate(dbPath(`/manifests/diff?a=${a}&b=${b}`))}
           className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-high disabled:cursor-not-allowed disabled:bg-ink-6"
         >
           Diff {picked.length === 2 ? `#${a} → #${b}` : 'two versions'}
@@ -66,7 +67,7 @@ export default function Manifests() {
                       </td>
                       <td className="py-1.5 pr-4">
                         <Link
-                          to={`/manifests/${m.id}`}
+                          to={dbPath(`/manifests/${m.id}`)}
                           className="font-mono text-accent hover:text-accent-high"
                         >
                           #{m.id}

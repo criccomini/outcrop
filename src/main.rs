@@ -1,11 +1,14 @@
 mod assets;
 mod cache;
+mod config;
 mod convert;
 mod demo;
 mod diff;
+mod discovery;
 mod dto;
 mod error;
 mod garbage;
+mod registry;
 mod routes;
 mod state;
 mod warnings;
@@ -21,16 +24,18 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
+use crate::discovery::ScanLimits;
 use crate::error::ApiError;
-use crate::state::AppState;
+use crate::registry::{Registry, Store};
 
 /// Read-only web dashboard for SlateDB.
 ///
 /// With no subcommand this serves the dashboard (UI + API), exactly like
-/// `serve`. The object store is configured through environment variables
-/// (or an env file), exactly like slatedb-cli: set CLOUD_PROVIDER to
-/// local | memory | aws | azure | opendal plus the provider-specific
-/// variables (e.g. LOCAL_PATH for local).
+/// `serve`. DBs are auto-discovered by walking the configured object
+/// store(s) for prefixes with a `manifest/` directory. The single-store
+/// case is configured through ambient environment variables, exactly like
+/// slatedb-cli (CLOUD_PROVIDER plus provider-specific variables); multiple
+/// stores via --config.
 #[derive(Parser, Debug)]
 #[command(
     version,
@@ -50,29 +55,39 @@ struct Cli {
 enum Command {
     /// Serve the dashboard: UI + API (default), --api-only, or --ui-only
     Serve(ServeArgs),
-    /// Seed the local demo DB if missing, then simulate live traffic
-    /// against it until Ctrl-C
+    /// Seed local demo DBs if missing, then simulate live traffic against
+    /// them until Ctrl-C
     Traffic(demo::TrafficArgs),
 }
 
 #[derive(clap::Args, Debug)]
 struct ServeArgs {
-    /// Path to the database root within the object store
-    #[arg(short, long, required_unless_present = "ui_only")]
-    path: Option<String>,
+    /// TOML file describing multiple object stores and their scan roots
+    /// (see README); without it, the single ambient-env store is scanned
+    #[arg(short, long, conflicts_with = "root")]
+    config: Option<String>,
+
+    /// Root prefix to scan for DBs on the ambient-env store (repeatable;
+    /// default: the store root)
+    #[arg(long)]
+    root: Vec<String>,
 
     /// Address to listen on
     #[arg(short, long, default_value = "127.0.0.1:8333")]
     listen: String,
 
-    /// Env file to load object store configuration from
-    #[arg(short, long)]
-    env_file: Option<String>,
-
-    /// TTL in seconds for cached reads of mutable state (latest manifest,
-    /// manifest listing, compactor state)
+    /// TTL in seconds for cached reads of mutable per-DB state (latest
+    /// manifest, listings, compactor state)
     #[arg(long, default_value_t = 5)]
     cache_ttl_secs: u64,
+
+    /// How many "directory" levels below each root discovery descends
+    #[arg(long, default_value_t = 4)]
+    scan_depth: usize,
+
+    /// Seconds discovery results are cached before rescanning
+    #[arg(long, default_value_t = 60)]
+    scan_ttl_secs: u64,
 
     /// Serve only the REST API (and /metrics) — no embedded UI
     #[arg(long, conflicts_with = "ui_only")]
@@ -103,24 +118,69 @@ fn init_tracing(default_filter: &str) {
         .init();
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+    Ok(tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?)
+}
+
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         // Surface slatedb's internal logs (flush/close/GC progress); raise
         // with e.g. RUST_LOG=slatedb=debug when diagnosing.
         Some(Command::Traffic(args)) => {
             init_tracing("slatedb=info");
-            demo::run_traffic(args).await
+            runtime()?.block_on(demo::run_traffic(args))
         }
-        Some(Command::Serve(args)) => {
-            init_tracing("slatedb_dashboard=info,tower_http=info");
-            serve(args).await
-        }
-        None => {
-            init_tracing("slatedb_dashboard=info,tower_http=info");
-            serve(cli.serve).await
-        }
+        Some(Command::Serve(args)) => run_serve(args),
+        None => run_serve(cli.serve),
+    }
+}
+
+fn run_serve(args: ServeArgs) -> anyhow::Result<()> {
+    init_tracing("slatedb_dashboard=info,tower_http=info");
+    // Stores are built BEFORE the tokio runtime exists: building stages
+    // provider settings as env vars (slatedb's loaders only read the
+    // process env), which is only sound while single-threaded.
+    let stores = if args.ui_only {
+        Vec::new()
+    } else {
+        build_stores(&args)?
+    };
+    runtime()?.block_on(serve(args, stores))
+}
+
+fn build_stores(args: &ServeArgs) -> anyhow::Result<Vec<Store>> {
+    if let Some(path) = &args.config {
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("reading config '{path}': {e}"))?;
+        let stores = config::build_stores(&text)?;
+        Ok(stores
+            .into_iter()
+            .map(|b| Store {
+                name: b.name,
+                provider: b.provider,
+                object_store: b.object_store,
+                roots: b.roots,
+            })
+            .collect())
+    } else {
+        let object_store = slatedb::admin::load_object_store_from_env(None)
+            .map_err(|e| anyhow::anyhow!("failed to load object store from env: {e}"))?;
+        let provider =
+            std::env::var("CLOUD_PROVIDER").unwrap_or_else(|_| "unknown".to_string());
+        let roots = if args.root.is_empty() {
+            vec![String::new()]
+        } else {
+            args.root.clone()
+        };
+        Ok(vec![Store {
+            name: "default".to_string(),
+            provider,
+            object_store,
+            roots,
+        }])
     }
 }
 
@@ -151,7 +211,7 @@ fn cors_layer(origins: &[String]) -> anyhow::Result<CorsLayer> {
     Ok(layer.allow_origin(parsed))
 }
 
-async fn serve(args: ServeArgs) -> anyhow::Result<()> {
+async fn serve(args: ServeArgs, stores: Vec<Store>) -> anyhow::Result<()> {
     let app: Router = if args.ui_only {
         // No object store, no API state — just the embedded SPA with the
         // remote API base injected into index.html.
@@ -164,31 +224,29 @@ async fn serve(args: ServeArgs) -> anyhow::Result<()> {
         info!("ui-only mode; the browser will call the API at {api_base}");
         Router::new().fallback(move |uri: Uri| assets::static_handler(uri, Some(api_base.clone())))
     } else {
-        let path = args
-            .path
-            .clone()
-            .expect("clap requires --path unless --ui-only");
-        let object_store = slatedb::admin::load_object_store_from_env(args.env_file.clone())
-            .map_err(|e| anyhow::anyhow!("failed to load object store from env: {e}"))?;
-        let provider =
-            std::env::var("CLOUD_PROVIDER").unwrap_or_else(|_| "unknown".to_string());
-
-        let state = Arc::new(AppState::new(
-            path.clone(),
-            provider,
-            object_store,
+        let registry = Arc::new(Registry::new(
+            stores,
+            ScanLimits {
+                max_depth: args.scan_depth,
+                ..ScanLimits::default()
+            },
+            Duration::from_secs(args.scan_ttl_secs),
             Duration::from_secs(args.cache_ttl_secs),
         ));
 
-        // Startup probe: warn loudly if there's no DB here, but start
-        // anyway — the DB may be created later.
-        match state.admin.read_manifest(None).await {
-            Ok(Some(m)) => info!("found SlateDB at '{}' (manifest id {})", path, m.id()),
-            Ok(None) => warn!("no manifest found at '{}' — is this a SlateDB root?", path),
-            Err(e) => warn!("could not read manifest at '{}': {e}", path),
+        // Startup scan: informational only — DBs may appear later.
+        match registry.scan(false).await {
+            Ok((_, dbs)) if dbs.is_empty() => {
+                warn!("no SlateDBs discovered — are the roots right? (rescans every {}s)", args.scan_ttl_secs)
+            }
+            Ok((_, dbs)) => {
+                let ids: Vec<&str> = dbs.iter().map(|d| d.id.as_str()).collect();
+                info!("discovered {} database(s): {}", dbs.len(), ids.join(", "))
+            }
+            Err(e) => warn!("initial discovery failed: {e}"),
         }
 
-        let mut app = routes::api_router(state);
+        let mut app = routes::root_router(registry);
         app = if args.api_only {
             info!("api-only mode; not serving the UI");
             app.fallback(api_only_fallback)

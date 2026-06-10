@@ -6,6 +6,7 @@ use axum::http::header;
 use axum::response::IntoResponse;
 
 use crate::convert;
+use crate::registry::Registry;
 use crate::state::AppState;
 
 /// Prometheus exposition-format label-value escaping.
@@ -20,24 +21,14 @@ fn escape_label(v: &str) -> String {
         .collect()
 }
 
-/// Renders gauges as `# HELP` / `# TYPE` / `name{db="…"} value` triples.
-fn render_metrics(db: &str, gauges: &[(&str, &str, f64)]) -> String {
-    let db = escape_label(db);
-    let mut out = String::new();
-    for (name, help, value) in gauges {
-        let _ = writeln!(out, "# HELP {name} {help}");
-        let _ = writeln!(out, "# TYPE {name} gauge");
-        let _ = writeln!(out, "{name}{{db=\"{db}\"}} {value}");
-    }
-    out
-}
+type Gauge = (&'static str, &'static str, f64);
 
-/// Prometheus metrics for the inspected DB. Never fails: when the manifest
-/// or listing can't be read, reports `slatedb_up 0` (with whatever gauges
-/// are still computable) rather than an error status, so scrapes keep
-/// working through outages — that is exactly when the signal matters.
-pub async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let mut gauges: Vec<(&str, &str, f64)> = Vec::new();
+/// Gauges for one DB. Never fails: when the manifest or listing can't be
+/// read, reports `slatedb_up 0` (with whatever gauges are still computable)
+/// rather than erroring, so scrapes keep working through outages — that is
+/// exactly when the signal matters.
+async fn collect_gauges(state: &AppState) -> Vec<Gauge> {
+    let mut gauges: Vec<Gauge> = Vec::new();
 
     let manifest = state.latest_manifest().await.ok().and_then(|m| {
         m.as_ref()
@@ -119,10 +110,60 @@ pub async fn metrics(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         }
     }
 
-    (
-        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
-        render_metrics(&state.db_path, &gauges),
-    )
+    gauges
+}
+
+/// Groups per-DB samples under one HELP/TYPE block per metric name, in
+/// first-seen order.
+fn render_grouped(per_db: &[(String, Vec<Gauge>)]) -> String {
+    let mut order: Vec<(&'static str, &'static str)> = Vec::new();
+    let mut samples: std::collections::HashMap<&'static str, Vec<(String, f64)>> =
+        std::collections::HashMap::new();
+    for (db, gauges) in per_db {
+        let db = escape_label(db);
+        for (name, help, value) in gauges {
+            if !samples.contains_key(name) {
+                order.push((name, help));
+            }
+            samples
+                .entry(name)
+                .or_default()
+                .push((db.clone(), *value));
+        }
+    }
+    let mut out = String::new();
+    for (name, help) in order {
+        let _ = writeln!(out, "# HELP {name} {help}");
+        let _ = writeln!(out, "# TYPE {name} gauge");
+        for (db, value) in &samples[name] {
+            let _ = writeln!(out, "{name}{{db=\"{db}\"}} {value}");
+        }
+    }
+    out
+}
+
+/// Prometheus metrics for every discovered DB, labeled `db="store:path"`.
+pub async fn metrics(State(registry): State<Arc<Registry>>) -> impl IntoResponse {
+    let mut per_db: Vec<(String, Vec<Gauge>)> = Vec::new();
+    let scan_ok = match registry.scan(false).await {
+        Ok((_, dbs)) => {
+            for db in dbs {
+                if let Ok(handle) = registry.resolve(&db.id).await {
+                    per_db.push((db.id, collect_gauges(&handle.state).await));
+                }
+            }
+            1.0
+        }
+        Err(_) => 0.0,
+    };
+
+    let mut out = String::new();
+    let _ = writeln!(out, "# HELP slatedb_dashboard_scan_up Whether DB discovery succeeded");
+    let _ = writeln!(out, "# TYPE slatedb_dashboard_scan_up gauge");
+    let _ = writeln!(out, "slatedb_dashboard_scan_up {scan_ok}");
+    out.push_str(&render_grouped(&per_db));
+
+    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)
 }
 
 #[cfg(test)]
@@ -138,17 +179,21 @@ mod tests {
     }
 
     #[test]
-    fn renders_exposition_format() {
-        let out = render_metrics("my-db", &[("slatedb_up", "Up", 1.0)]);
+    fn renders_exposition_format_grouped_across_dbs() {
+        let out = render_grouped(&[
+            ("store:db1".to_string(), vec![("slatedb_up", "Up", 1.0)]),
+            ("store:db2".to_string(), vec![("slatedb_up", "Up", 0.0)]),
+        ]);
         assert_eq!(
             out,
-            "# HELP slatedb_up Up\n# TYPE slatedb_up gauge\nslatedb_up{db=\"my-db\"} 1\n"
+            "# HELP slatedb_up Up\n# TYPE slatedb_up gauge\n\
+             slatedb_up{db=\"store:db1\"} 1\nslatedb_up{db=\"store:db2\"} 0\n"
         );
     }
 
     #[test]
     fn renders_escaped_db_label() {
-        let out = render_metrics("a\"b", &[("slatedb_up", "Up", 0.0)]);
+        let out = render_grouped(&[("a\"b".to_string(), vec![("slatedb_up", "Up", 0.0)])]);
         assert!(out.contains("slatedb_up{db=\"a\\\"b\"} 0"));
     }
 }

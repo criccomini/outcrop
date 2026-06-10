@@ -30,45 +30,70 @@ metadata reads, and object listings.
 
 ## Running
 
-Everything is one binary. The object store is configured through environment
-variables (or an `--env-file`), exactly like `slatedb-cli`:
+Everything is one binary, and DBs are **auto-discovered**: the dashboard
+walks the configured object store(s) and detects a SlateDB wherever a
+prefix has a `manifest/` directory with manifest files in it. The fleet
+page lists every discovered DB; each DB gets its own URLs under `/db/{id}`.
 
 ```sh
-# UI + API together (the default; `serve` may be omitted)
-CLOUD_PROVIDER=local LOCAL_PATH=/path/to/store \
-  slatedb-dashboard --path my-db
+# Single store from ambient env vars (exactly like slatedb-cli); scans the
+# whole store by default, or scoped prefixes via --root (repeatable).
+CLOUD_PROVIDER=local LOCAL_PATH=/path/to/store slatedb-dashboard
+CLOUD_PROVIDER=aws AWS_BUCKET=my-bucket ... slatedb-dashboard serve --root dbs/
 
-# S3
-CLOUD_PROVIDER=aws AWS_BUCKET=my-bucket ... \
-  slatedb-dashboard serve --path my-db --listen 0.0.0.0:8333
+# Multiple stores via a self-contained TOML config:
+slatedb-dashboard serve --config stores.toml
 
 # REST API only (no UI). CORS defaults to '*' in this mode so a ui-only
 # instance can call it from the browser; restrict with --cors-allow-origin.
-slatedb-dashboard serve --api-only --path my-db
+slatedb-dashboard serve --api-only
 
 # UI only: serves just the SPA, with the API base baked into index.html —
 # the browser calls that API directly. No object-store config needed here.
 slatedb-dashboard serve --ui-only --api-url http://api-host:8333
 ```
 
-Serve flags: `--path` (DB root within the store; required unless
-`--ui-only`), `--listen` (default `127.0.0.1:8333`), `--env-file`,
-`--cache-ttl-secs` (default 5 — object-store reads of mutable state are
-cached and shared across viewers, so polling cost stays bounded),
-`--api-only` / `--ui-only --api-url URL`, `--cors-allow-origin` (repeatable).
+`stores.toml` carries each store's provider settings inline, keyed by the
+documented env-var names lowercased. Values may reference ambient env vars
+with `${VAR}` — that's how multiple stores of the same provider use
+different credentials without putting secrets in the file (unset keys also
+fall through to the ambient env):
+
+```toml
+[[stores]]
+name = "local"
+provider = "local"            # local | memory | aws | azure
+local_path = "/data/store"
+roots = [""]                  # prefixes to scan (default: the store root)
+
+[[stores]]
+name = "prod"
+provider = "aws"
+aws_bucket = "prod-bucket"
+aws_region = "us-east-1"
+aws_access_key_id = "${PROD_AWS_KEY_ID}"
+aws_secret_access_key = "${PROD_AWS_SECRET}"
+roots = ["dbs/"]
+```
+
+Serve flags: `--config FILE` or `--root PREFIX` (repeatable), `--listen`
+(default `127.0.0.1:8333`), `--cache-ttl-secs` (default 5 — object-store
+reads of mutable state are cached and shared across viewers, so polling
+cost stays bounded), `--scan-depth` (default 4) / `--scan-ttl-secs`
+(default 60) for discovery, `--api-only` / `--ui-only --api-url URL`,
+`--cors-allow-origin` (repeatable).
 
 ## Demo
 
 ```sh
-# Seed ./demo-data with a local DB if it doesn't exist yet, then simulate
-# live traffic against it until Ctrl-C (this is the only mode that writes;
-# the dashboard itself never does): puts/deletes at a slowly swinging rate,
-# embedded compactor and GC enabled, short-lived checkpoints every couple
-# of minutes.
-cargo run -- traffic                         # --rate, --checkpoint-secs
+# Seed three demo DBs into ./demo-data if missing, then simulate live
+# traffic against all of them concurrently until Ctrl-C (this is the only
+# mode that writes; the dashboard itself never does). Each DB runs at a
+# different rate and phase so the fleet looks heterogeneous.
+cargo run -- traffic                         # --dbs, --rate, --checkpoint-secs
 
-# Then watch it:
-CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run -- --path demo-db
+# Then watch them (the fleet page lists all three):
+CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run
 ```
 
 Note: `LOCAL_PATH` must be absolute — the object store canonicalizes it.

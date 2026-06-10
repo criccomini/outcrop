@@ -1,6 +1,11 @@
 import { Fragment } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useActivity, useCompactions, useCompactorState } from '../api/client'
+import {
+  useActivity,
+  useCompactions,
+  useCompactorState,
+  useDbPath,
+} from '../api/client'
 import type { ActivityDto, VersionedCompactionsDto } from '../api/types'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
@@ -213,6 +218,7 @@ function FilterBar({
 
 function CompactingNow() {
   const state = useCompactorState()
+  const dbPath = useDbPath()
   const active = state.data?.compactions?.compactions.filter((c) => c.active) ?? []
   if (active.length === 0) return null
   return (
@@ -234,7 +240,7 @@ function CompactingNow() {
             )}
           </span>
           <Link
-            to="/compactions"
+            to={dbPath('/compactions')}
             className="ml-auto shrink-0 text-xs underline-offset-2 hover:underline"
           >
             details
@@ -248,6 +254,7 @@ function CompactingNow() {
 export default function Activity() {
   const query = useActivity(50)
   const compactions = useCompactions()
+  const dbPath = useDbPath()
   const [params, setParams] = useSearchParams()
   const selected = new Set(
     (params.get('kinds')?.split(',') ?? []).filter((k): k is FeedKind =>
@@ -331,7 +338,7 @@ export default function Activity() {
                               )}
                             </span>
                             <Link
-                              to={row.link.to}
+                              to={dbPath(row.link.to)}
                               className="ml-auto shrink-0 font-mono text-xs text-accent hover:text-accent-high"
                             >
                               {row.link.label}

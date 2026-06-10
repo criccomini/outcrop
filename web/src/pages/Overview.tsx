@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useOverview } from '../api/client'
+import { useDbPath, useOverview } from '../api/client'
 import { GarbagePanel } from '../components/GarbagePanel'
 import { Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
@@ -7,6 +7,7 @@ import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
 export default function Overview() {
   const query = useOverview()
+  const dbPath = useDbPath()
   return (
     <div>
       <h1 className="text-3xl">Overview</h1>
@@ -43,7 +44,7 @@ export default function Overview() {
                 label="Manifest"
                 value={
                   <Link
-                    to={`/manifests/${o.manifest_id}`}
+                    to={dbPath(`/manifests/${o.manifest_id}`)}
                     className="text-accent hover:text-accent-high"
                   >
                     #{o.manifest_id}
@@ -84,7 +85,7 @@ export default function Overview() {
                 label="Checkpoints"
                 value={
                   <Link
-                    to="/checkpoints"
+                    to={dbPath('/checkpoints')}
                     className="text-accent hover:text-accent-high"
                   >
                     {o.checkpoint_count}
@@ -113,7 +114,7 @@ export default function Overview() {
         <GarbagePanel
           action={
             <Link
-              to="/garbage"
+              to={dbPath('/garbage')}
               className="text-xs text-accent hover:text-accent-high"
             >
               details →

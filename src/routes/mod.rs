@@ -1,6 +1,7 @@
 mod activity;
 mod checkpoints;
 mod compactions;
+mod dbs;
 mod garbage;
 mod lsm;
 mod manifests;
@@ -11,14 +12,16 @@ mod wal;
 
 use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{any, get};
 use axum::Router;
 
+use crate::registry::Registry;
 use crate::state::AppState;
 
+/// Routes for one DB. Mounted per discovered DB behind the dispatcher,
+/// which rewrites `/api/dbs/{db}/…` to the `/api/…` paths used here.
 pub fn api_router(state: Arc<AppState>) -> Router {
     Router::new()
-        .route("/api/health", get(overview::health))
         .route("/api/overview", get(overview::overview))
         .route("/api/activity", get(activity::list))
         .route("/api/lsm", get(lsm::lsm))
@@ -34,7 +37,16 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/checkpoints", get(checkpoints::list))
         .route("/api/clones", get(checkpoints::clones))
         .route("/api/garbage", get(garbage::garbage))
-        // Root-level by Prometheus convention, intentionally not under /api.
-        .route("/metrics", get(metrics::metrics))
         .with_state(state)
+}
+
+/// Top-level API: discovery, global health, per-DB dispatch, and the
+/// all-DBs Prometheus endpoint (root-level by convention).
+pub fn root_router(registry: Arc<Registry>) -> Router {
+    Router::new()
+        .route("/api/health", get(dbs::health))
+        .route("/api/dbs", get(dbs::list))
+        .route("/api/dbs/{db}/{*rest}", any(dbs::dispatch))
+        .route("/metrics", get(metrics::metrics))
+        .with_state(registry)
 }

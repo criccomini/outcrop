@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { useManifestDiff } from '../api/client'
+import { useDbPath, useManifestDiff } from '../api/client'
 import type { SstViewDto } from '../api/types'
 import { KeyDisplay } from '../components/KeyDisplay'
 import { Panel } from '../components/Panel'
@@ -36,21 +36,31 @@ export default function ManifestDiff() {
   const a = Number(params.get('a'))
   const b = Number(params.get('b'))
   const query = useManifestDiff(a, b)
+  const dbPath = useDbPath()
 
   return (
     <div>
       <div className="flex items-baseline gap-4">
         <h1 className="text-3xl">
           Diff{' '}
-          <Link to={`/manifests/${a}`} className="text-accent hover:text-accent-high">
+          <Link
+            to={dbPath(`/manifests/${a}`)}
+            className="text-accent hover:text-accent-high"
+          >
             #{a}
           </Link>{' '}
           →{' '}
-          <Link to={`/manifests/${b}`} className="text-accent hover:text-accent-high">
+          <Link
+            to={dbPath(`/manifests/${b}`)}
+            className="text-accent hover:text-accent-high"
+          >
             #{b}
           </Link>
         </h1>
-        <Link to="/manifests" className="text-sm text-accent hover:text-accent-high">
+        <Link
+          to={dbPath('/manifests')}
+          className="text-sm text-accent hover:text-accent-high"
+        >
           ← all manifests
         </Link>
       </div>

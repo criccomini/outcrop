@@ -286,8 +286,20 @@ export interface ActivityDto {
 
 export interface HealthDto {
   status: string
-  db_path: string
-  provider: string
+  store_count: number
+  db_count?: number
+}
+
+export interface DbInfoDto {
+  /** "{store}:{path}" — the identity used by /api/dbs/{id} and /db/{id}. */
+  id: string
+  store: string
+  path: string
+}
+
+export interface DbsDto {
+  scanned_at: string
+  dbs: DbInfoDto[]
 }
 
 export interface GarbageCategoryDto {

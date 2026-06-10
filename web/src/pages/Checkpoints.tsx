@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useCheckpoints, useClones } from '../api/client'
+import { useCheckpoints, useClones, useDbPath } from '../api/client'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatRelative, formatTime } from '../lib/format'
@@ -23,6 +23,7 @@ function ExpiryCell({ expireTime }: { expireTime?: string }) {
 export default function Checkpoints() {
   const checkpoints = useCheckpoints()
   const clones = useClones()
+  const dbPath = useDbPath()
 
   return (
     <div>
@@ -54,7 +55,7 @@ export default function Checkpoints() {
                         <td className="py-1.5 pr-4">
                           {c.manifest_available ? (
                             <Link
-                              to={`/manifests/${c.manifest_id}`}
+                              to={dbPath(`/manifests/${c.manifest_id}`)}
                               className="font-mono text-accent hover:text-accent-high"
                             >
                               #{c.manifest_id}

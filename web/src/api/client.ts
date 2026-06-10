@@ -1,8 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { useParams } from 'react-router-dom'
 import type {
   ActivityDto,
   CheckpointStatusDto,
   CompactorStateDto,
+  DbsDto,
   ExternalDbDto,
   GarbageDto,
   HealthDto,
@@ -54,6 +57,29 @@ async function fetchJson<T>(url: string): Promise<T> {
 /** Poll interval for pages that track live DB state. */
 export const LIVE_REFETCH_MS = 10_000
 
+/** Poll interval for DB discovery. */
+export const DBS_REFETCH_MS = 30_000
+
+/**
+ * The active DB id from the /db/:dbId route (react-router decodes the
+ * segment). Hooks accept an explicit id so pages outside that route (the
+ * fleet view) can query any DB.
+ */
+export function useDbId(explicit?: string): string {
+  const params = useParams()
+  return explicit ?? params.dbId ?? ''
+}
+
+/** Prefixes an app route with the active DB: '/lsm' → '/db/{id}/lsm'. */
+export function useDbPath(): (path: string) => string {
+  const db = useDbId()
+  return (path: string) => `/db/${encodeURIComponent(db)}${path}`
+}
+
+function api(db: string): string {
+  return `/api/dbs/${encodeURIComponent(db)}`
+}
+
 export function useHealth() {
   return useQuery<HealthDto, ApiRequestError>({
     queryKey: ['health'],
@@ -61,11 +87,27 @@ export function useHealth() {
   })
 }
 
-export function useOverview() {
+export function useDbs() {
+  return useQuery<DbsDto, ApiRequestError>({
+    queryKey: ['dbs'],
+    queryFn: () => fetchJson('/api/dbs'),
+    refetchInterval: DBS_REFETCH_MS,
+  })
+}
+
+/** Forces a discovery rescan, then refreshes the cached list. */
+export async function rescanDbs(queryClient: QueryClient): Promise<void> {
+  const fresh = await fetchJson<DbsDto>('/api/dbs?rescan=1')
+  queryClient.setQueryData(['dbs'], fresh)
+}
+
+export function useOverview(dbId?: string) {
+  const db = useDbId(dbId)
   return useQuery<OverviewDto, ApiRequestError>({
-    queryKey: ['overview'],
-    queryFn: () => fetchJson('/api/overview'),
+    queryKey: [db, 'overview'],
+    queryFn: () => fetchJson(`${api(db)}/overview`),
     refetchInterval: LIVE_REFETCH_MS,
+    enabled: db !== '',
   })
 }
 
@@ -75,11 +117,14 @@ export function useOverview() {
  * stops the scrubber flashing a loading state on every step.
  */
 export function useLsm(manifestId?: number) {
+  const db = useDbId()
   return useQuery<LsmDto, ApiRequestError>({
-    queryKey: ['lsm', manifestId ?? 'latest'],
+    queryKey: [db, 'lsm', manifestId ?? 'latest'],
     queryFn: () =>
       fetchJson(
-        manifestId === undefined ? '/api/lsm' : `/api/lsm?manifest_id=${manifestId}`,
+        manifestId === undefined
+          ? `${api(db)}/lsm`
+          : `${api(db)}/lsm?manifest_id=${manifestId}`,
       ),
     refetchInterval: manifestId === undefined ? LIVE_REFETCH_MS : false,
     placeholderData: keepPreviousData,
@@ -87,94 +132,107 @@ export function useLsm(manifestId?: number) {
 }
 
 export function useManifestIds() {
+  const db = useDbId()
   return useQuery<ManifestIdDto[], ApiRequestError>({
-    queryKey: ['manifest-ids'],
-    queryFn: () => fetchJson('/api/manifests/ids'),
+    queryKey: [db, 'manifest-ids'],
+    queryFn: () => fetchJson(`${api(db)}/manifests/ids`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useActivity(limit = 20) {
+  const db = useDbId()
   return useQuery<ActivityDto[], ApiRequestError>({
-    queryKey: ['activity', limit],
-    queryFn: () => fetchJson(`/api/activity?limit=${limit}`),
+    queryKey: [db, 'activity', limit],
+    queryFn: () => fetchJson(`${api(db)}/activity?limit=${limit}`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useManifests(limit = 50) {
+  const db = useDbId()
   return useQuery<ManifestSummaryDto[], ApiRequestError>({
-    queryKey: ['manifests', limit],
-    queryFn: () => fetchJson(`/api/manifests?limit=${limit}`),
+    queryKey: [db, 'manifests', limit],
+    queryFn: () => fetchJson(`${api(db)}/manifests?limit=${limit}`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useManifest(id: string) {
+  const db = useDbId()
   return useQuery<ManifestDto, ApiRequestError>({
-    queryKey: ['manifest', id],
-    queryFn: () => fetchJson(`/api/manifests/${id}`),
+    queryKey: [db, 'manifest', id],
+    queryFn: () => fetchJson(`${api(db)}/manifests/${id}`),
   })
 }
 
 export function useManifestDiff(a: number, b: number) {
+  const db = useDbId()
   return useQuery<ManifestDiffDto, ApiRequestError>({
-    queryKey: ['manifest-diff', a, b],
-    queryFn: () => fetchJson(`/api/manifests/diff?a=${a}&b=${b}`),
+    queryKey: [db, 'manifest-diff', a, b],
+    queryFn: () => fetchJson(`${api(db)}/manifests/diff?a=${a}&b=${b}`),
   })
 }
 
 export function useSst(ulid: string | null) {
+  const db = useDbId()
   return useQuery<SstDetailDto, ApiRequestError>({
-    queryKey: ['sst', ulid],
-    queryFn: () => fetchJson(`/api/ssts/${ulid}`),
+    queryKey: [db, 'sst', ulid],
+    queryFn: () => fetchJson(`${api(db)}/ssts/${ulid}`),
     enabled: ulid !== null,
   })
 }
 
 export function useWal() {
+  const db = useDbId()
   return useQuery<WalDto, ApiRequestError>({
-    queryKey: ['wal'],
-    queryFn: () => fetchJson('/api/wal'),
+    queryKey: [db, 'wal'],
+    queryFn: () => fetchJson(`${api(db)}/wal`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useCompactorState() {
+  const db = useDbId()
   return useQuery<CompactorStateDto, ApiRequestError>({
-    queryKey: ['compactor-state'],
-    queryFn: () => fetchJson('/api/compactor/state'),
+    queryKey: [db, 'compactor-state'],
+    queryFn: () => fetchJson(`${api(db)}/compactor/state`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useCompactions(limit = 20) {
+  const db = useDbId()
   return useQuery<VersionedCompactionsDto[], ApiRequestError>({
-    queryKey: ['compactions', limit],
-    queryFn: () => fetchJson(`/api/compactions?limit=${limit}`),
+    queryKey: [db, 'compactions', limit],
+    queryFn: () => fetchJson(`${api(db)}/compactions?limit=${limit}`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useCheckpoints() {
+  const db = useDbId()
   return useQuery<CheckpointStatusDto[], ApiRequestError>({
-    queryKey: ['checkpoints'],
-    queryFn: () => fetchJson('/api/checkpoints'),
-    refetchInterval: LIVE_REFETCH_MS,
-  })
-}
-
-export function useGarbage() {
-  return useQuery<GarbageDto, ApiRequestError>({
-    queryKey: ['garbage'],
-    queryFn: () => fetchJson('/api/garbage'),
+    queryKey: [db, 'checkpoints'],
+    queryFn: () => fetchJson(`${api(db)}/checkpoints`),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
 
 export function useClones() {
+  const db = useDbId()
   return useQuery<ExternalDbDto[], ApiRequestError>({
-    queryKey: ['clones'],
-    queryFn: () => fetchJson('/api/clones'),
+    queryKey: [db, 'clones'],
+    queryFn: () => fetchJson(`${api(db)}/clones`),
+  })
+}
+
+export function useGarbage(dbId?: string) {
+  const db = useDbId(dbId)
+  return useQuery<GarbageDto, ApiRequestError>({
+    queryKey: [db, 'garbage'],
+    queryFn: () => fetchJson(`${api(db)}/garbage`),
+    refetchInterval: LIVE_REFETCH_MS,
+    enabled: db !== '',
   })
 }

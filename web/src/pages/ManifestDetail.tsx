@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { useManifest } from '../api/client'
+import { useDbPath, useManifest } from '../api/client'
 import { JsonTree } from '../components/JsonTree'
 import { Panel, Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
@@ -8,12 +8,13 @@ import { formatBytes } from '../lib/format'
 export default function ManifestDetail() {
   const { id } = useParams<{ id: string }>()
   const query = useManifest(id ?? 'latest')
+  const dbPath = useDbPath()
 
   return (
     <div>
       <div className="flex items-baseline gap-4">
         <h1 className="text-3xl">Manifest #{id}</h1>
-        <Link to="/manifests" className="text-sm text-accent hover:text-accent-high">
+        <Link to={dbPath('/manifests')} className="text-sm text-accent hover:text-accent-high">
           ← all manifests
         </Link>
       </div>

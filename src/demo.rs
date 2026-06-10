@@ -23,9 +23,14 @@ pub struct TrafficArgs {
     #[arg(long, default_value = "./demo-data")]
     dir: String,
 
-    /// DB root path within the object store
+    /// Base DB root path; DBs are named {path}-1..N (just {path} when
+    /// --dbs 1)
     #[arg(long, default_value = "demo-db")]
     path: String,
+
+    /// How many DBs to seed and churn concurrently
+    #[arg(long, default_value_t = 3)]
+    dbs: usize,
 
     /// Seed waves when creating a fresh demo DB; each wave ends with a
     /// flush (≈ one L0 SST)
@@ -40,8 +45,8 @@ pub struct TrafficArgs {
     #[arg(long, default_value_t = 10)]
     compact_secs: u64,
 
-    /// Average operations per second; the actual rate swings between 20%
-    /// and 100% of this on a slow cycle
+    /// Average operations per second for the busiest DB; the others run at
+    /// a fraction of this, and every rate swings 20–100% on a slow cycle
     #[arg(long, default_value_t = 150)]
     rate: u64,
 
@@ -114,6 +119,7 @@ async fn open_traffic_db(path: &str, store: Arc<dyn ObjectStore>) -> anyhow::Res
 
 async fn write_waves(
     db: &Db,
+    tag: &str,
     waves: std::ops::Range<usize>,
     args: &TrafficArgs,
     rng: &mut Lcg,
@@ -149,7 +155,7 @@ async fn write_waves(
             }
         }
         db.flush().await?;
-        println!("  wave {}/{} flushed", wave + 1, args.waves);
+        println!("[{tag}] wave {}/{} flushed", wave + 1, args.waves);
     }
     Ok(())
 }
@@ -174,23 +180,28 @@ async fn create_checkpoint(
 
 /// One-shot deterministic base: two write phases around an explicit
 /// compaction pass, with named checkpoints.
-async fn seed_base(args: &TrafficArgs, store: Arc<dyn ObjectStore>) -> anyhow::Result<()> {
+async fn seed_base(
+    args: &TrafficArgs,
+    db_path: &str,
+    store: Arc<dyn ObjectStore>,
+) -> anyhow::Result<()> {
     let mut rng = Lcg(42);
     let mut written: u64 = 0;
     let mut deleted: u64 = 0;
     let phase1_waves = (args.waves * 2) / 3;
 
     println!(
-        "seeding {} waves x {} keys into {}/{} ...",
-        args.waves, args.keys_per_wave, args.dir, args.path
+        "[{db_path}] seeding {} waves x {} keys into {}/{db_path} ...",
+        args.waves, args.keys_per_wave, args.dir
     );
 
     // Phase 1: bulk of the data, then a named checkpoint.
-    let db = open_seed_db(&args.path, store.clone()).await?;
-    write_waves(&db, 0..phase1_waves, args, &mut rng, &mut written, &mut deleted).await?;
+    let db = open_seed_db(db_path, store.clone()).await?;
+    write_waves(&db, db_path, 0..phase1_waves, args, &mut rng, &mut written, &mut deleted)
+        .await?;
     db.close().await?;
     create_checkpoint(
-        &args.path,
+        db_path,
         store.clone(),
         "demo-midway",
         Some(Duration::from_secs(7 * 24 * 3600)),
@@ -202,24 +213,25 @@ async fn seed_base(args: &TrafficArgs, store: Arc<dyn ObjectStore>) -> anyhow::R
     // a second compactor would fence an open Db's embedded one (and with it
     // the whole Db handle).
     if args.compact_secs > 0 {
-        println!("running compactor for {}s ...", args.compact_secs);
-        let admin = AdminBuilder::new(args.path.clone(), store.clone()).build();
+        println!("[{db_path}] running compactor for {}s ...", args.compact_secs);
+        let admin = AdminBuilder::new(db_path.to_string(), store.clone()).build();
         let token = CancellationToken::new();
         let stop = token.clone();
         let handle = tokio::spawn(async move { admin.run_compactor(token).await });
         tokio::time::sleep(Duration::from_secs(args.compact_secs)).await;
         stop.cancel();
         match handle.await? {
-            Ok(()) => println!("compactor finished"),
-            Err(e) => println!("compactor exited with: {e}"),
+            Ok(()) => println!("[{db_path}] compactor finished"),
+            Err(e) => println!("[{db_path}] compactor exited with: {e}"),
         }
     }
 
     // Phase 3: reopen (bumps writer epoch) and leave fresh L0 SSTs stacked
     // on top of the sorted runs.
-    let db = open_seed_db(&args.path, store.clone()).await?;
+    let db = open_seed_db(db_path, store.clone()).await?;
     write_waves(
         &db,
+        db_path,
         phase1_waves..args.waves,
         args,
         &mut rng,
@@ -228,41 +240,45 @@ async fn seed_base(args: &TrafficArgs, store: Arc<dyn ObjectStore>) -> anyhow::R
     )
     .await?;
     db.close().await?;
-    println!("seeded {written} puts, {deleted} deletes");
+    println!("[{db_path}] seeded {written} puts, {deleted} deletes");
 
-    create_checkpoint(&args.path, store.clone(), "demo-final", None).await?;
+    create_checkpoint(db_path, store.clone(), "demo-final", None).await?;
     Ok(())
 }
 
-/// Seed the demo DB when missing, then write puts/deletes forever at a
-/// slowly swinging rate, with short-lived checkpoints so expiry/GC dynamics
-/// stay visible. Returns on Ctrl-C.
-pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
-    std::fs::create_dir_all(&args.dir)?;
-    let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix(&args.dir)?);
+/// Per-DB rate factors so the fleet looks heterogeneous in the dashboard.
+const RATE_FACTORS: [f64; 3] = [1.0, 0.45, 0.2];
 
-    let db_dir = std::path::Path::new(&args.dir).join(&args.path);
+/// Seed one DB when missing, then write puts/deletes until cancelled.
+async fn run_one(
+    args: Arc<TrafficArgs>,
+    db_path: String,
+    idx: usize,
+    store: Arc<dyn ObjectStore>,
+    token: CancellationToken,
+) -> anyhow::Result<()> {
+    let db_dir = std::path::Path::new(&args.dir).join(&db_path);
     if db_dir.exists() {
-        println!(
-            "found existing demo DB at {} — skipping seed",
-            db_dir.display()
-        );
+        println!("[{db_path}] found existing demo DB — skipping seed");
     } else {
-        seed_base(&args, store.clone()).await?;
+        seed_base(&args, &db_path, store.clone()).await?;
     }
 
-    let db = open_traffic_db(&args.path, store.clone()).await?;
+    let rate = (args.rate as f64) * RATE_FACTORS[idx % RATE_FACTORS.len()];
+    // Stagger the sine phase per DB so the fleet doesn't move in lockstep.
+    let phase_offset = (idx as f64) * 60.0;
+
+    let db = open_traffic_db(&db_path, store.clone()).await?;
     // Churn the seeded keyspace, extend past it on inserts.
     let mut key_high = (args.waves * args.keys_per_wave) as u64;
-    let mut rng = Lcg(0xC0FFEE);
+    let mut rng = Lcg(0xC0FFEE + idx as u64);
     let write_opts = WriteOptions {
         await_durable: false,
         ..Default::default()
     };
 
     println!(
-        "simulating ~{} ops/s against {}/{} (rate swings 20–100% on a 4m cycle) — Ctrl-C to stop",
-        args.rate, args.dir, args.path
+        "[{db_path}] simulating ~{rate:.0} ops/s (swings 20–100% on a 4m cycle)"
     );
 
     let started = Instant::now();
@@ -273,19 +289,18 @@ pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
     let mut last_report = Instant::now();
     let mut last_checkpoint = Instant::now();
     let mut checkpoint_n = 0u64;
-    let shutdown = tokio::signal::ctrl_c();
-    tokio::pin!(shutdown);
 
     loop {
         tokio::select! {
-            _ = &mut shutdown => break,
+            _ = token.cancelled() => break,
             _ = tick.tick() => {}
         }
 
         // Sine-modulated rate, full cycle every 4 minutes, floor at 20%.
-        let phase = started.elapsed().as_secs_f64() / 240.0 * std::f64::consts::TAU;
+        let phase =
+            (started.elapsed().as_secs_f64() + phase_offset) / 240.0 * std::f64::consts::TAU;
         let mult = 0.2 + 0.8 * (0.5 * (1.0 + phase.sin()));
-        let ops = ((args.rate as f64) * mult / 10.0).round() as u64;
+        let ops = (rate * mult / 10.0).round() as u64;
 
         for _ in 0..ops {
             let roll = rng.next() % 10;
@@ -327,31 +342,66 @@ pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
             // Best-effort: a manifest CAS race with the writer or compactor
             // shouldn't kill the simulation.
             if let Err(e) = create_checkpoint(
-                &args.path,
+                &db_path,
                 store.clone(),
                 &name,
                 Some(Duration::from_secs(300)),
             )
             .await
             {
-                println!("checkpoint '{name}' failed (continuing): {e}");
+                println!("[{db_path}] checkpoint '{name}' failed (continuing): {e}");
             }
         }
 
         if last_report.elapsed() >= Duration::from_secs(10) {
             let actual = ops_since_report as f64 / last_report.elapsed().as_secs_f64();
             println!(
-                "[t+{:>4}s] {actual:.0} ops/s (target {:.0}) · {puts} puts · {deletes} deletes · keyspace {key_high}",
+                "[{db_path}] [t+{:>4}s] {actual:.0} ops/s (target {:.0}) · {puts} puts · {deletes} deletes · keyspace {key_high}",
                 started.elapsed().as_secs(),
-                args.rate as f64 * mult,
+                rate * mult,
             );
             last_report = Instant::now();
             ops_since_report = 0;
         }
     }
 
-    println!("shutting down (flushing) ...");
+    println!("[{db_path}] shutting down (flushing) ...");
     db.close().await?;
-    println!("wrote {puts} puts, {deletes} deletes");
+    println!("[{db_path}] wrote {puts} puts, {deletes} deletes");
+    Ok(())
+}
+
+/// Seed missing demo DBs, then churn all of them concurrently at varied
+/// rates and phases. Returns once every DB has flushed after Ctrl-C.
+pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
+    anyhow::ensure!(args.dbs >= 1, "--dbs must be at least 1");
+    std::fs::create_dir_all(&args.dir)?;
+    let store: Arc<dyn ObjectStore> = Arc::new(LocalFileSystem::new_with_prefix(&args.dir)?);
+
+    let args = Arc::new(args);
+    let token = CancellationToken::new();
+    let mut handles = Vec::new();
+    for i in 0..args.dbs {
+        let db_path = if args.dbs == 1 {
+            args.path.clone()
+        } else {
+            format!("{}-{}", args.path, i + 1)
+        };
+        handles.push(tokio::spawn(run_one(
+            args.clone(),
+            db_path,
+            i,
+            store.clone(),
+            token.clone(),
+        )));
+    }
+
+    tokio::signal::ctrl_c().await?;
+    token.cancel();
+    for handle in handles {
+        if let Err(e) = handle.await? {
+            println!("traffic task failed: {e}");
+        }
+    }
     Ok(())
 }

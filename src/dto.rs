@@ -364,8 +364,24 @@ pub struct ActivityDto {
 #[derive(Serialize, Clone, Debug)]
 pub struct HealthDto {
     pub status: &'static str,
-    pub db_path: String,
-    pub provider: String,
+    pub store_count: usize,
+    /// Discovered DBs as of the last scan; absent before the first scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub db_count: Option<usize>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct DbInfoDto {
+    /// "{store}:{path}" — the URL-safe identity used by /api/dbs/{id}.
+    pub id: String,
+    pub store: String,
+    pub path: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct DbsDto {
+    pub scanned_at: DateTime<Utc>,
+    pub dbs: Vec<DbInfoDto>,
 }
 
 /// Per-directory breakdown of stored objects: live (referenced by the latest
