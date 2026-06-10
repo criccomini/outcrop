@@ -38,6 +38,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = { version = "1", features = ["serde"] }
 uuid = { version = "1", features = ["serde"] }
 
+[dev-dependencies]
+async-trait = "0.1"
+
 # To develop against a local slatedb checkout, uncomment:
 # [patch.crates-io]
 # slatedb = { path = "../slatedb/slatedb" }

@@ -37,6 +37,14 @@ pub struct DbHandle {
 
 type ScanResult = (DateTime<Utc>, Vec<DbInfo>);
 
+/// Whether DB `path` lies under discovery root `root` (both
+/// store-relative, '/'-separated, no trailing slashes).
+fn under_root(path: &str, root: &str) -> bool {
+    root.is_empty()
+        || path == root
+        || path.strip_prefix(root).is_some_and(|rest| rest.starts_with('/'))
+}
+
 pub struct Registry {
     stores: Vec<Store>,
     limits: ScanLimits,
@@ -79,8 +87,9 @@ impl Registry {
     }
 
     /// Discovers DBs across every store root, cached for `scan_ttl`. A
-    /// store that fails to list is logged and skipped so one bad store
-    /// can't blank out the whole fleet.
+    /// (store, root) whose walk fails is logged and keeps the previous
+    /// scan's DBs, so one bad store can't blank out the whole fleet and a
+    /// transient LIST error can't 404 a store's live DBs for a scan_ttl.
     pub async fn scan(&self, force: bool) -> Result<ScanResult, ApiError> {
         let mut guard = self.scan.lock().await;
         if !force {
@@ -90,6 +99,10 @@ impl Registry {
                 }
             }
         }
+        let prev: Vec<DbInfo> = guard
+            .as_ref()
+            .map(|(_, (_, dbs))| dbs.clone())
+            .unwrap_or_default();
 
         let mut found: Vec<DbInfo> = Vec::new();
         for store in &self.stores {
@@ -101,7 +114,17 @@ impl Registry {
                         path,
                     })),
                     Err(e) => {
-                        tracing::warn!(store = store.name, root, "discovery failed: {e}");
+                        tracing::warn!(
+                            store = store.name,
+                            root,
+                            "discovery failed, keeping previously found DBs: {e}"
+                        );
+                        let root = root.trim_matches('/');
+                        found.extend(
+                            prev.iter()
+                                .filter(|d| d.store == store.name && under_root(&d.path, root))
+                                .cloned(),
+                        );
                     }
                 }
             }
@@ -149,29 +172,106 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use futures::stream::BoxStream;
     use slatedb::object_store::memory::InMemory;
     use slatedb::object_store::path::Path;
+    use slatedb::object_store::{
+        self, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
+        PutOptions, PutPayload, PutResult,
+    };
 
-    async fn registry_with_one_db() -> Registry {
-        let store = InMemory::new();
-        store
-            .put(
-                &Path::from("demo/manifest/00000000000000000001.manifest"),
-                slatedb::bytes::Bytes::from_static(b"x").into(),
-            )
-            .await
-            .unwrap();
+    /// InMemory wrapper whose delimiter LISTs (what discovery walks) can be
+    /// made to fail, simulating a store outage.
+    #[derive(Debug, Default)]
+    struct FlakyStore {
+        inner: InMemory,
+        fail_lists: AtomicBool,
+    }
+
+    impl std::fmt::Display for FlakyStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "FlakyStore")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ObjectStore for FlakyStore {
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            opts: PutOptions,
+        ) -> object_store::Result<PutResult> {
+            self.inner.put_opts(location, payload, opts).await
+        }
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            opts: PutMultipartOptions,
+        ) -> object_store::Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, opts).await
+        }
+        async fn get_opts(
+            &self,
+            location: &Path,
+            options: GetOptions,
+        ) -> object_store::Result<GetResult> {
+            self.inner.get_opts(location, options).await
+        }
+        async fn delete(&self, location: &Path) -> object_store::Result<()> {
+            self.inner.delete(location).await
+        }
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, object_store::Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+        async fn list_with_delimiter(
+            &self,
+            prefix: Option<&Path>,
+        ) -> object_store::Result<ListResult> {
+            if self.fail_lists.load(Ordering::Relaxed) {
+                return Err(object_store::Error::Generic {
+                    store: "flaky",
+                    source: "simulated outage".into(),
+                });
+            }
+            self.inner.list_with_delimiter(prefix).await
+        }
+        async fn copy(&self, from: &Path, to: &Path) -> object_store::Result<()> {
+            self.inner.copy(from, to).await
+        }
+        async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> object_store::Result<()> {
+            self.inner.copy_if_not_exists(from, to).await
+        }
+    }
+
+    const DEMO_MANIFEST: &str = "demo/manifest/00000000000000000001.manifest";
+
+    fn registry_over(store: Arc<dyn ObjectStore>) -> Registry {
         Registry::new(
             vec![Store {
                 name: "mem".into(),
                 provider: "memory".into(),
-                object_store: Arc::new(store),
+                object_store: store,
                 roots: vec![String::new()],
             }],
             ScanLimits::default(),
             Duration::from_secs(60),
             Duration::from_secs(5),
         )
+    }
+
+    async fn registry_with_one_db() -> Registry {
+        let store = InMemory::new();
+        store
+            .put(
+                &Path::from(DEMO_MANIFEST),
+                slatedb::bytes::Bytes::from_static(b"x").into(),
+            )
+            .await
+            .unwrap();
+        registry_over(Arc::new(store))
     }
 
     #[tokio::test]
@@ -183,6 +283,44 @@ mod tests {
         assert_eq!(dbs[0].store, "mem");
         assert_eq!(dbs[0].path, "demo");
         assert_eq!(registry.peek_db_count(), Some(1));
+    }
+
+    #[tokio::test]
+    async fn failed_discovery_keeps_previous_dbs() {
+        let store = Arc::new(FlakyStore::default());
+        store
+            .put(
+                &Path::from(DEMO_MANIFEST),
+                slatedb::bytes::Bytes::from_static(b"x").into(),
+            )
+            .await
+            .unwrap();
+        let registry = registry_over(store.clone());
+        let (_, dbs) = registry.scan(false).await.unwrap();
+        assert_eq!(dbs.len(), 1);
+
+        // Outage: a forced scan must not blank out the known DBs, and they
+        // must keep resolving.
+        store.fail_lists.store(true, Ordering::Relaxed);
+        let (_, dbs) = registry.scan(true).await.unwrap();
+        assert_eq!(dbs.len(), 1);
+        assert_eq!(dbs[0].id, "mem:demo");
+        assert!(registry.resolve("mem:demo").await.is_ok());
+
+        // Recovery: a real deletion is still observed by the next walk.
+        store.fail_lists.store(false, Ordering::Relaxed);
+        store.delete(&Path::from(DEMO_MANIFEST)).await.unwrap();
+        let (_, dbs) = registry.scan(true).await.unwrap();
+        assert!(dbs.is_empty());
+    }
+
+    #[test]
+    fn under_root_matches_whole_segments_only() {
+        assert!(under_root("teams/a/db1", ""));
+        assert!(under_root("teams/a/db1", "teams"));
+        assert!(under_root("teams", "teams"));
+        assert!(!under_root("teams2/db", "teams"));
+        assert!(!under_root("team", "teams"));
     }
 
     #[tokio::test]
