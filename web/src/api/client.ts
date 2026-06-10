@@ -261,6 +261,22 @@ export function useCompactions(limit = 20) {
   })
 }
 
+/** One immutable `.compactions` version, via the ranged list endpoint. */
+export function useCompactionsVersion(id: number) {
+  const db = useDbId()
+  return useQuery<VersionedCompactionsDto | undefined, ApiRequestError>({
+    queryKey: [db, 'compactions-version', id],
+    queryFn: async () => {
+      const list = await fetchJson<VersionedCompactionsDto[]>(
+        `${api(db)}/compactions?start=${id}&limit=1`,
+      )
+      return list.find((v) => v.id === id)
+    },
+    enabled: Number.isFinite(id),
+    staleTime: Infinity, // immutable once written
+  })
+}
+
 export function useCheckpoints() {
   const db = useDbId()
   return useQuery<CheckpointStatusDto[], ApiRequestError>({

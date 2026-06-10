@@ -21,6 +21,8 @@ import Manifests from './pages/Manifests'
 import ManifestDetail from './pages/ManifestDetail'
 import ManifestDiff from './pages/ManifestDiff'
 import Compactions from './pages/Compactions'
+import CompactionsDiff from './pages/CompactionsDiff'
+import CompactionsVersion from './pages/CompactionsVersion'
 import Checkpoints from './pages/Checkpoints'
 import Garbage from './pages/Garbage'
 import Wal from './pages/Wal'
@@ -106,6 +108,10 @@ function DbArea() {
       return <ManifestDetail id={arg ?? ''} />
     case 'compactions':
       return <Compactions />
+    case 'compactions/diff':
+      return <CompactionsDiff />
+    case 'compactions/id':
+      return <CompactionsVersion id={arg ?? ''} />
     case 'checkpoints':
       return <Checkpoints />
     case 'garbage':

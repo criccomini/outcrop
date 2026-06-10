@@ -20,21 +20,25 @@ export const DB_PAGES = [
 export interface DbRoute {
   /** DB path within the store ('' on the store-listing page). */
   path: string
-  /** '' = overview; otherwise a DB_PAGES entry, 'manifests/diff', or 'manifests/id'. */
+  /**
+   * '' = overview; otherwise a DB_PAGES entry, or '{manifests|compactions}/diff'
+   * or '{manifests|compactions}/id' for the two-level pages.
+   */
   page: string
-  /** The manifest id when page === 'manifests/id'. */
+  /** The id when page ends in '/id'. */
   arg?: string
 }
 
 export function splitDbSplat(splat: string): DbRoute {
   const segs = splat.split('/').filter(Boolean)
-  if (segs.length >= 2 && segs[segs.length - 2] === 'manifests') {
+  const parent = segs[segs.length - 2]
+  if (segs.length >= 2 && (parent === 'manifests' || parent === 'compactions')) {
     const last = segs[segs.length - 1]
     if (last === 'diff') {
-      return { path: segs.slice(0, -2).join('/'), page: 'manifests/diff' }
+      return { path: segs.slice(0, -2).join('/'), page: `${parent}/diff` }
     }
     if (/^\d+$/.test(last)) {
-      return { path: segs.slice(0, -2).join('/'), page: 'manifests/id', arg: last }
+      return { path: segs.slice(0, -2).join('/'), page: `${parent}/id`, arg: last }
     }
   }
   const last = segs[segs.length - 1]
