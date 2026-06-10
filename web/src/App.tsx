@@ -51,7 +51,6 @@ export default function App() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3">
-            <RefreshTimer />
             {health.data && (
               <span className="hidden font-mono text-xs text-ink-4 md:inline">
                 {health.data.provider}://{health.data.db_path}
@@ -60,6 +59,7 @@ export default function App() {
             <span className="rounded-full border border-ink-6 bg-surface-2 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-ink-4">
               read-only
             </span>
+            <RefreshTimer />
           </div>
         </div>
       </header>
