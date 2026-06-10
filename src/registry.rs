@@ -3,7 +3,7 @@
 //! discovered DB. The per-DB router is the unchanged `routes::api_router`,
 //! so the registry is purely a layer above the existing single-DB code.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -131,6 +131,14 @@ impl Registry {
         }
         found.sort_by(|a, b| a.id.cmp(&b.id));
         found.dedup_by(|a, b| a.id == b.id);
+
+        // Drop handles for DBs that vanished: a DB recreated at the same
+        // path must get a fresh AppState, or its manifest-id-keyed caches
+        // (ids restart at 1) would serve the old DB's manifests forever.
+        {
+            let ids: HashSet<&str> = found.iter().map(|d| d.id.as_str()).collect();
+            self.dbs.lock().unwrap().retain(|id, _| ids.contains(id.as_str()));
+        }
 
         let result = (Utc::now(), found);
         *guard = Some((Instant::now(), result.clone()));
@@ -312,6 +320,38 @@ mod tests {
         store.delete(&Path::from(DEMO_MANIFEST)).await.unwrap();
         let (_, dbs) = registry.scan(true).await.unwrap();
         assert!(dbs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn recreated_db_gets_a_fresh_state() {
+        let store = Arc::new(InMemory::new());
+        store
+            .put(
+                &Path::from(DEMO_MANIFEST),
+                slatedb::bytes::Bytes::from_static(b"x").into(),
+            )
+            .await
+            .unwrap();
+        let registry = registry_over(store.clone());
+        let old = registry.resolve("mem:demo").await.unwrap();
+
+        // DB deleted: the next scan must evict its handle.
+        store.delete(&Path::from(DEMO_MANIFEST)).await.unwrap();
+        registry.scan(true).await.unwrap();
+        assert!(registry.resolve("mem:demo").await.is_err());
+
+        // Recreated at the same path: must not see the old AppState (its
+        // manifest-id-keyed caches belong to the deleted DB).
+        store
+            .put(
+                &Path::from(DEMO_MANIFEST),
+                slatedb::bytes::Bytes::from_static(b"y").into(),
+            )
+            .await
+            .unwrap();
+        registry.scan(true).await.unwrap();
+        let new = registry.resolve("mem:demo").await.unwrap();
+        assert!(!Arc::ptr_eq(&old.state, &new.state));
     }
 
     #[test]
