@@ -12,7 +12,7 @@ use slatedb::SstReader;
 use ulid::Ulid;
 
 use crate::cache::{LruMap, TtlCache};
-use crate::dto::{CompactorStateDto, GcEventDto, SstDetailDto};
+use crate::dto::{CompactorStateDto, GcEventDto, LsmSummaryDto, SstDetailDto};
 use crate::error::ApiError;
 
 /// A manifest file as seen by a raw object-store listing. `list_manifests`
@@ -104,6 +104,9 @@ pub struct AppState {
     pub compactor_state: TtlCache<CompactorStateDto>,
     pub manifest_by_id: LruMap<u64, VersionedManifest>,
     pub sst_details: LruMap<Ulid, SstDetailDto>,
+    /// Summaries are pure functions of an immutable manifest, keyed by
+    /// (manifest id, requested segment index; -1 = root/auto).
+    pub lsm_summaries: LruMap<(u64, i64), LsmSummaryDto>,
     pub gc_observer: std::sync::Mutex<GcObserver>,
 }
 
@@ -130,6 +133,7 @@ impl AppState {
             compactor_state: TtlCache::new(ttl),
             manifest_by_id: LruMap::new(256),
             sst_details: LruMap::new(64),
+            lsm_summaries: LruMap::new(128),
             gc_observer: std::sync::Mutex::new(GcObserver::new()),
         }
     }

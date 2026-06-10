@@ -11,6 +11,7 @@ mod garbage;
 mod registry;
 mod routes;
 mod state;
+mod summary;
 mod warnings;
 
 use std::sync::Arc;

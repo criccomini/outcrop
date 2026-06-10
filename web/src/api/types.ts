@@ -143,6 +143,39 @@ export interface LsmDto {
   segment_extractor_name?: string
 }
 
+export interface LevelSummaryDto {
+  label: string
+  run_id?: number
+  is_l0: boolean
+  sst_count: number
+  est_bytes: number
+  /** Max SSTs-deep per key-space bucket (read amplification). */
+  coverage: number[]
+  /** Present only when the level is small enough to render per-SST. */
+  ssts?: SstViewDto[]
+}
+
+export interface SegmentMetaDto {
+  prefix: KeyDto
+  sst_count: number
+  est_bytes: number
+}
+
+export interface LsmSummaryDto {
+  manifest_id: number
+  segment_extractor_name?: string
+  segments: SegmentMetaDto[]
+  /** Segment whose levels are below; absent = the root tree. */
+  segment?: number
+  root_sst_count: number
+  buckets: number
+  /** Bucket edge keys; empty when the tree has no keyed SSTs. */
+  bucket_keys: KeyDto[]
+  levels: LevelSummaryDto[]
+  total_bytes: number
+  l0_bytes: number
+}
+
 export interface SstInfoDto {
   first_key?: KeyDto
   last_key?: KeyDto

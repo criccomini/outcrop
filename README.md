@@ -16,7 +16,7 @@ metadata reads, and object listings.
 - **Alerts** — health warnings (L0 backlog, WAL window growth, stale
   manifests, expired checkpoints) in one place, with a count badge in the
   nav.
-- **LSM Tree** — visual tree: levels by size and key-range coverage
+- **LSM Tree** — visual tree: levels by size and key-range coverage; levels too large to draw per-SST render as coverage histograms, so the page stays fast on huge DBs
   (overlap reads as read amplification), with per-SST drill-down into block
   index, bloom filter/stats sizes, and content stats.
 - **Manifests** — full history, structured view of any version, and a

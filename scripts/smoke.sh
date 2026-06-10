@@ -30,11 +30,13 @@ echo "  using db '$ID'"
 
 db /overview | jq -e '.manifest_id >= 1 and .sst_count >= 0 and (.warnings | type == "array")' > /dev/null || fail "overview invariants"
 db /lsm | jq -e '.tree | has("l0") and has("runs")' > /dev/null || fail "lsm shape"
+db /lsm/summary | jq -e '(.levels | type == "array") and (.levels[0].coverage | length) == .buckets' > /dev/null || fail "lsm summary shape"
 db /wal | jq -e 'has("next_wal_sst_id") and (.entries | type == "array")' > /dev/null || fail "wal shape"
 
 LATEST=$(db /overview | jq .manifest_id)
 db /manifests/ids | jq -e 'length >= 1' > /dev/null || fail "manifest ids"
 db "/lsm?manifest_id=$LATEST" | jq -e ".manifest_id == $LATEST" > /dev/null || fail "lsm time travel"
+db "/lsm/summary?manifest_id=$LATEST" | jq -e ".manifest_id == $LATEST" > /dev/null || fail "lsm summary time travel"
 db "/manifests?limit=10" | jq -e 'length >= 1' > /dev/null || fail "manifests list"
 db "/manifests/$LATEST" | jq -e ".id == $LATEST" > /dev/null || fail "manifest by id"
 db /manifests/latest | jq -e ".id == $LATEST" > /dev/null || fail "manifest latest"

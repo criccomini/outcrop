@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useLsm, useManifestIds } from '../api/client'
+import { useLsmSummary, useManifestIds } from '../api/client'
 import { HelpTip } from '../components/HelpTip'
 import { KeyRangeView, SizeView } from '../components/LsmTreeViz'
 import { Panel } from '../components/Panel'
@@ -8,19 +8,23 @@ import { QueryGate } from '../components/QueryGate'
 import { SstDetailDrawer } from '../components/SstDetailDrawer'
 import { keyText } from '../components/KeyDisplay'
 import { formatTime } from '../lib/format'
-import type { TreeDto } from '../api/types'
 
 export default function Lsm() {
   const [params, setParams] = useSearchParams()
   const rawId = params.get('manifest_id')
   const manifestId = rawId !== null ? Number(rawId) : undefined
-  const query = useLsm(manifestId)
-  const ids = useManifestIds()
   // ?sst=ULID (e.g. from search results) opens the drawer on load.
   const [selected, setSelected] = useState<string | null>(() =>
     params.get('sst'),
   )
+  // -1 = no explicit pick: the server returns the root tree, or falls
+  // through to segment 0 when a segmented DB's root is empty.
   const [segmentIdx, setSegmentIdx] = useState<number>(-1)
+  const query = useLsmSummary(
+    manifestId,
+    segmentIdx >= 0 ? segmentIdx : undefined,
+  )
+  const ids = useManifestIds()
 
   // A different manifest may have different segments, and its SSTs may since
   // have been GC'd — reset the drill-down state when the view target moves.
@@ -55,14 +59,10 @@ export default function Lsm() {
           const hasSegments = lsm.segments.length > 0
           // In a segmented DB the root tree only matters if something
           // actually landed there (keys without an extractable prefix);
-          // otherwise hide its tab and default to the first segment.
-          const rootEmpty = lsm.tree.l0.length === 0 && lsm.tree.runs.length === 0
-          const showRoot = !hasSegments || !rootEmpty
-          const effIdx = segmentIdx >= 0 ? segmentIdx : showRoot ? -1 : 0
-          const tree: TreeDto =
-            hasSegments && effIdx >= 0 && effIdx < lsm.segments.length
-              ? lsm.segments[effIdx].tree
-              : lsm.tree
+          // otherwise hide its tab. The server applies the same rule when
+          // no segment is requested, so `segment` says which tab is live.
+          const showRoot = !hasSegments || lsm.root_sst_count > 0
+          const effIdx = segmentIdx >= 0 ? segmentIdx : (lsm.segment ?? -1)
           const historical = manifestId !== undefined
           return (
             <div className="mt-6 space-y-6">
@@ -135,6 +135,7 @@ export default function Lsm() {
                     <SegmentTab
                       key={seg.prefix.hex}
                       label={keyText(seg.prefix)}
+                      title={`${seg.sst_count.toLocaleString()} SSTs`}
                       active={effIdx === i}
                       onClick={() => setSegmentIdx(i)}
                     />
@@ -151,7 +152,11 @@ export default function Lsm() {
                   </HelpTip>
                 }
               >
-                <SizeView tree={tree} selected={selected} onSelect={setSelected} />
+                <SizeView
+                  levels={lsm.levels}
+                  selected={selected}
+                  onSelect={setSelected}
+                />
               </Panel>
 
               <Panel
@@ -161,12 +166,14 @@ export default function Lsm() {
                     Horizontal position is the key space (rank-scaled).
                     Translucent overlapping spans in L0 are SSTs a point read
                     may have to consult — vertical overlap reads as read
-                    amplification.
+                    amplification. Levels too large to draw per-SST show a
+                    histogram instead: darker means more SSTs deep.
                   </HelpTip>
                 }
               >
                 <KeyRangeView
-                  tree={tree}
+                  levels={lsm.levels}
+                  bucketKeys={lsm.bucket_keys}
                   selected={selected}
                   onSelect={setSelected}
                 />
@@ -184,16 +191,19 @@ export default function Lsm() {
 
 function SegmentTab({
   label,
+  title,
   active,
   onClick,
 }: {
   label: string
+  title?: string
   active: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      title={title}
       className={`rounded-md px-3 py-1 font-mono text-xs transition-colors ${
         active
           ? 'bg-accent-low text-accent-high'

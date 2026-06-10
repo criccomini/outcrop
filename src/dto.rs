@@ -190,6 +190,52 @@ pub struct LsmDto {
     pub segment_extractor_name: Option<String>,
 }
 
+/// Per-level aggregate for the summary LSM view. `ssts` is present only
+/// when the level is small enough to render SSTs individually.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct LevelSummaryDto {
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<u32>,
+    pub is_l0: bool,
+    pub sst_count: usize,
+    pub est_bytes: u64,
+    /// SSTs-per-bucket depth across the key space (read amplification).
+    pub coverage: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssts: Option<Vec<SstViewDto>>,
+}
+
+/// Segment descriptor without tree contents: enough for tabs and totals.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct SegmentMetaDto {
+    pub prefix: KeyDto,
+    pub sst_count: usize,
+    pub est_bytes: u64,
+}
+
+/// Summary-first LSM payload: O(levels × buckets) regardless of how many
+/// SSTs the tree holds, so huge DBs render without shipping every SST.
+#[derive(Serialize, Clone, Debug)]
+pub struct LsmSummaryDto {
+    pub manifest_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub segment_extractor_name: Option<String>,
+    pub segments: Vec<SegmentMetaDto>,
+    /// Segment whose levels are below; absent = the root tree.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub segment: Option<usize>,
+    pub root_sst_count: usize,
+    /// Bucket count of every `coverage` array in `levels`.
+    pub buckets: usize,
+    /// Bucket edge keys (bucket i spans bucket_keys[i]..bucket_keys[i+1]);
+    /// empty when the tree has no keyed SSTs.
+    pub bucket_keys: Vec<KeyDto>,
+    pub levels: Vec<LevelSummaryDto>,
+    pub total_bytes: u64,
+    pub l0_bytes: u64,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct SstInfoDto {
     #[serde(skip_serializing_if = "Option::is_none")]

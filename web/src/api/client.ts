@@ -12,7 +12,7 @@ import type {
   GarbageDto,
   GcEventsDto,
   HealthDto,
-  LsmDto,
+  LsmSummaryDto,
   ManifestDiffDto,
   ManifestDto,
   ManifestIdDto,
@@ -168,20 +168,23 @@ export function useOverview(dbId?: string) {
 }
 
 /**
- * LSM tree as of `manifestId`, or the live latest when undefined. Historical
- * manifests are immutable, so polling is off for them; keepPreviousData
- * stops the scrubber flashing a loading state on every step.
+ * Summary-first LSM view as of `manifestId` (live latest when undefined),
+ * scoped to one segment (undefined = root, or the server's auto-pick for
+ * segmented DBs with an empty root). Per-level aggregates plus a coverage
+ * histogram; per-SST detail rides along only for small levels, so the
+ * payload stays bounded for huge trees. Historical manifests are immutable,
+ * so polling is off for them; keepPreviousData stops the scrubber and the
+ * segment tabs flashing a loading state on every step.
  */
-export function useLsm(manifestId?: number) {
+export function useLsmSummary(manifestId?: number, segment?: number) {
   const db = useDbId()
-  return useQuery<LsmDto, ApiRequestError>({
-    queryKey: [db, 'lsm', manifestId ?? 'latest'],
-    queryFn: () =>
-      fetchJson(
-        manifestId === undefined
-          ? `${api(db)}/lsm`
-          : `${api(db)}/lsm?manifest_id=${manifestId}`,
-      ),
+  const qs = new URLSearchParams()
+  if (manifestId !== undefined) qs.set('manifest_id', String(manifestId))
+  if (segment !== undefined) qs.set('segment', String(segment))
+  const suffix = qs.size > 0 ? `?${qs}` : ''
+  return useQuery<LsmSummaryDto, ApiRequestError>({
+    queryKey: [db, 'lsm-summary', manifestId ?? 'latest', segment ?? 'auto'],
+    queryFn: () => fetchJson(`${api(db)}/lsm/summary${suffix}`),
     meta: manifestId === undefined ? { live: true } : undefined,
     placeholderData: keepPreviousData,
   })
