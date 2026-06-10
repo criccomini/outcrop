@@ -6,6 +6,37 @@ use crate::dto::{
     KeyDto, LevelSummaryDto, LsmSummaryDto, ManifestDto, SegmentMetaDto, SstViewDto, TreeDto,
 };
 
+/// Physical key bounds clamped by the view's visible range: projected
+/// views (range-cloned DBs) only read the intersection, and counting the
+/// invisible remainder would overstate depth exactly where nothing is
+/// readable. None when the SST has no recorded bounds or no visible part.
+/// Hex strings compare in byte order, so string comparison is key order.
+fn effective_bounds(sst: &SstViewDto) -> Option<(&KeyDto, &KeyDto)> {
+    let (mut f, mut l) = match (&sst.first_key, &sst.last_key) {
+        (Some(f), Some(l)) => (f, l),
+        _ => return None,
+    };
+    if let Some(r) = &sst.visible_range {
+        if let Some(s) = &r.start {
+            if s.key.hex > l.hex || (s.key.hex == l.hex && !s.inclusive) {
+                return None;
+            }
+            if s.key.hex > f.hex {
+                f = &s.key;
+            }
+        }
+        if let Some(e) = &r.end {
+            if e.key.hex < f.hex || (e.key.hex == f.hex && !e.inclusive) {
+                return None;
+            }
+            if e.key.hex < l.hex {
+                l = &e.key;
+            }
+        }
+    }
+    Some((f, l))
+}
+
 /// Levels at or below this SST count ship per-SST detail.
 pub const DETAIL_CAP: usize = 64;
 /// Key-space buckets in each coverage histogram.
@@ -89,11 +120,13 @@ fn summarize_tree(
         });
     }
 
-    // Distinct boundary keys, sorted. Hex strings compare in byte order.
+    // Distinct boundary keys (visibility-clamped), sorted. Hex strings
+    // compare in byte order.
     let mut boundaries: Vec<&KeyDto> = srcs
         .iter()
         .flat_map(|s| s.ssts.iter())
-        .flat_map(|s| s.first_key.iter().chain(s.last_key.iter()))
+        .filter_map(effective_bounds)
+        .flat_map(|(f, l)| [f, l])
         .collect();
     boundaries.sort_by(|a, b| a.hex.cmp(&b.hex));
     boundaries.dedup_by(|a, b| a.hex == b.hex);
@@ -129,7 +162,7 @@ fn summarize_tree(
             let mut ends = vec![0u32; n];
             let mut any = false;
             for sst in src.ssts {
-                let (Some(f), Some(l)) = (&sst.first_key, &sst.last_key) else {
+                let Some((f, l)) = effective_bounds(sst) else {
                     continue;
                 };
                 let r0 = rank_of(&f.hex);
@@ -185,7 +218,7 @@ fn summarize_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dto::{SegmentDto, SortedRunDto, SstIdDto};
+    use crate::dto::{BoundDto, RangeDto, SegmentDto, SortedRunDto, SstIdDto};
 
     fn key(s: &str) -> KeyDto {
         KeyDto {
@@ -243,6 +276,42 @@ mod tests {
             checkpoints: vec![],
             external_dbs: vec![],
         }
+    }
+
+    fn visible(mut s: SstViewDto, start: Option<&str>, end: Option<&str>) -> SstViewDto {
+        let bound = |k: &str| BoundDto {
+            key: key(k),
+            inclusive: true,
+        };
+        s.visible_range = Some(RangeDto {
+            start: start.map(bound),
+            end: end.map(bound),
+        });
+        s
+    }
+
+    #[test]
+    fn visible_range_clamps_coverage_to_the_projection() {
+        // A clone of range c..f over an SST physically spanning a..z: the
+        // histogram must span c..f, not the parent's whole keyspace.
+        let t = tree(
+            vec![visible(sst("a", "z", 10), Some("c"), Some("f"))],
+            vec![],
+        );
+        let (levels, edges) = summarize_tree(&t, 8, 64);
+        assert_eq!(edges[0].utf8.as_deref(), Some("c"));
+        assert_eq!(edges[8].utf8.as_deref(), Some("f"));
+        assert!(levels[0].coverage.iter().all(|&d| d == 1));
+    }
+
+    #[test]
+    fn fully_projected_out_sst_contributes_nothing() {
+        // Physical a..b but only x.. is visible: nothing of it is readable.
+        let t = tree(vec![visible(sst("a", "b", 10), Some("x"), None)], vec![]);
+        let (levels, edges) = summarize_tree(&t, 8, 64);
+        assert_eq!(levels[0].sst_count, 1);
+        assert!(levels[0].coverage.iter().all(|&d| d == 0));
+        assert!(edges.is_empty());
     }
 
     #[test]
