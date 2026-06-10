@@ -35,6 +35,7 @@ export default function Manifests() {
         <QueryGate query={query}>
           {(manifests) => (
             <Panel>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -91,6 +92,7 @@ export default function Manifests() {
                   ))}
                 </tbody>
               </table>
+              </div>
               <p className="mt-3 text-xs text-ink-5">
                 Newest first. Pick two versions to diff them.
               </p>

@@ -28,29 +28,12 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-ink-7 bg-surface-0/85 shadow-sm backdrop-blur-md backdrop-saturate-150">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
-          <a href="/" className="flex items-center">
+        {/* Below xl the nav drops to its own horizontally scrollable row. */}
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center px-4 xl:h-14 xl:flex-nowrap xl:gap-6">
+          <a href="/" className="order-1 flex h-12 items-center xl:h-14">
             <img src="/img/logo-full.svg" alt="SlateDB" className="h-7" />
           </a>
-          <nav className="flex items-center gap-1 text-sm font-medium">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-1.5 transition-colors ${
-                    isActive
-                      ? 'bg-accent-low text-accent-high'
-                      : 'text-ink-3 hover:bg-surface-2 hover:text-ink-1'
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="order-2 ml-auto flex h-12 items-center gap-3 xl:order-3 xl:h-14">
             {health.data && (
               <span className="hidden font-mono text-xs text-ink-4 md:inline">
                 {health.data.provider}://{health.data.db_path}
@@ -61,6 +44,24 @@ export default function App() {
             </span>
             <RefreshTimer />
           </div>
+          <nav className="order-3 -mx-4 flex w-full items-center gap-1 overflow-x-auto px-4 pb-2 text-sm font-medium xl:order-2 xl:mx-0 xl:w-auto xl:overflow-visible xl:px-0 xl:pb-0">
+            {NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  `shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 transition-colors ${
+                    isActive
+                      ? 'bg-accent-low text-accent-high'
+                      : 'text-ink-3 hover:bg-surface-2 hover:text-ink-1'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-8">

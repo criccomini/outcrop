@@ -55,6 +55,7 @@ export default function Wal() {
                       : 'No WAL SSTs (all garbage-collected, or nothing written yet).'}
                   </span>
                 ) : (
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -88,7 +89,7 @@ export default function Wal() {
                             </td>
                             <td className="py-1.5">
                               {unreplayed ? (
-                                <span className="font-medium text-accent-high">
+                                <span className="font-medium text-ink-1">
                                   un-replayed
                                 </span>
                               ) : (
@@ -100,6 +101,7 @@ export default function Wal() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
                 <p className="mt-3 text-xs text-ink-5">
                   Newest first. Un-replayed SSTs (id above the replay

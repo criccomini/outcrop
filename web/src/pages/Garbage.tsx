@@ -18,6 +18,7 @@ function Pinners({ g }: { g: GarbageDto }) {
   }
   return (
     <>
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -66,7 +67,7 @@ function Pinners({ g }: { g: GarbageDto }) {
                 {p.extra_count === 0 ? (
                   <span className="text-ink-5">—</span>
                 ) : (
-                  <span className="font-medium text-accent-high">
+                  <span className="font-semibold text-ink-1">
                     {formatBytes(p.extra_bytes)}
                     <span className="ml-1 text-xs font-normal text-ink-4">
                       ({p.extra_count.toLocaleString()} object
@@ -79,6 +80,7 @@ function Pinners({ g }: { g: GarbageDto }) {
           ))}
         </tbody>
       </table>
+      </div>
       <div className="mt-3 text-xs text-ink-5">
         "Keeps alive" counts data objects referenced only via the checkpoint's
         manifest; checkpoints sharing a manifest report the same objects, so
@@ -110,7 +112,10 @@ function RecentSweeps() {
         return (
           <ol className="divide-y divide-ink-7/50">
             {sweeps.map(({ it, c }) => (
-              <li key={it.b} className="flex items-baseline gap-3 py-2">
+              <li
+                key={it.b}
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2"
+              >
                 <span
                   className="w-20 shrink-0 text-right text-xs text-ink-4"
                   title={formatTime(it.at)}
@@ -140,9 +145,6 @@ export default function Garbage() {
       <h1 className="text-3xl">Garbage Collection</h1>
       <div className="mt-6 space-y-5">
         <GarbagePanel />
-        <Panel title="Checkpoints pinning storage">
-          <QueryGate query={query}>{(g) => <Pinners g={g} />}</QueryGate>
-        </Panel>
         <Panel
           title="Recent GC sweeps"
           action={
@@ -155,6 +157,9 @@ export default function Garbage() {
           }
         >
           <RecentSweeps />
+        </Panel>
+        <Panel title="Checkpoints pinning storage">
+          <QueryGate query={query}>{(g) => <Pinners g={g} />}</QueryGate>
         </Panel>
       </div>
     </div>

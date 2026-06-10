@@ -34,6 +34,7 @@ export default function Checkpoints() {
               {cps.length === 0 ? (
                 <span className="text-sm text-ink-5">no checkpoints</span>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -78,6 +79,7 @@ export default function Checkpoints() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </Panel>
           )}

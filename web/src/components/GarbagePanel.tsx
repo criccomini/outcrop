@@ -50,9 +50,11 @@ function CategoryRow({ label, c }: { label: string; c: GarbageCategoryDto }) {
     count === 0 ? (
       <span className="text-ink-5">—</span>
     ) : (
-      <span className={highlight ? 'font-medium text-accent-high' : undefined}>
+      <span className={highlight ? 'font-semibold text-ink-1' : undefined}>
         {formatBytes(bytes)}
-        <span className="ml-1 text-xs text-ink-4">({count.toLocaleString()})</span>
+        <span className="ml-1 text-xs font-normal text-ink-4">
+          ({count.toLocaleString()})
+        </span>
       </span>
     )
   return (
@@ -90,11 +92,7 @@ export function GarbagePanel({ action }: { action?: React.ReactNode }) {
                 <div className="text-xs font-semibold uppercase tracking-wider text-ink-5">
                   Reclaimable
                 </div>
-                <div
-                  className={`mt-1 text-2xl ${
-                    g.reclaimable_bytes > 0 ? 'text-accent-high' : 'text-ink-1'
-                  }`}
-                >
+                <div className="mt-1 text-2xl text-ink-1">
                   {formatBytes(g.reclaimable_bytes)}
                 </div>
                 <div className="mt-0.5 text-xs text-ink-4">
@@ -119,7 +117,8 @@ export function GarbagePanel({ action }: { action?: React.ReactNode }) {
               </div>
             </div>
             <StorageBar g={g} />
-            <table className="mt-4 w-full text-sm">
+            <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
                   <th className="py-1 pr-2 font-semibold">Objects</th>
@@ -135,6 +134,7 @@ export function GarbagePanel({ action }: { action?: React.ReactNode }) {
                 <CategoryRow label="Manifests" c={g.manifests} />
               </tbody>
             </table>
+            </div>
             <div className="mt-3 text-xs text-ink-5">
               Live = referenced by the latest manifest; pinned = kept only by an
               unexpired checkpoint; reclaimable = what the garbage collector would

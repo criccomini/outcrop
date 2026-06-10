@@ -29,7 +29,7 @@ export function SstDetailDrawer({
 }) {
   const query = useSst(ulid)
   return (
-    <aside className="fixed top-14 right-0 bottom-0 z-10 w-[26rem] overflow-y-auto border-l border-ink-7 bg-surface-1 p-5 shadow-lg">
+    <aside className="fixed inset-y-0 right-0 z-30 w-full max-w-[26rem] overflow-y-auto border-l border-ink-7 bg-surface-1 p-5 shadow-lg xl:top-14 xl:z-10">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-serif text-lg text-ink-1">SST</h3>

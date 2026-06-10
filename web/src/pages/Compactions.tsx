@@ -33,6 +33,7 @@ function CompactionTable({ compactions }: { compactions: CompactionDto[] }) {
     return <span className="text-sm text-ink-5">none</span>
   }
   return (
+    <div className="overflow-x-auto">
     <table className="w-full text-sm">
       <thead>
         <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -67,6 +68,7 @@ function CompactionTable({ compactions }: { compactions: CompactionDto[] }) {
         ))}
       </tbody>
     </table>
+    </div>
   )
 }
 

@@ -161,6 +161,7 @@ export default function ManifestDiff() {
               {d.scalars.length === 0 ? (
                 <span className="text-sm text-ink-5">no changes</span>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-ink-5">
@@ -179,6 +180,7 @@ export default function ManifestDiff() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </Panel>
           </div>

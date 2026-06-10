@@ -220,7 +220,7 @@ function CompactingNow() {
       {active.map((c) => (
         <div
           key={c.id}
-          className="flex items-baseline gap-3 rounded-lg border border-accent/40 bg-accent-low px-4 py-2 text-sm text-accent-high"
+          className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-lg border border-accent/40 bg-accent-low px-4 py-2 text-sm text-accent-high"
         >
           <span className="text-xs font-semibold uppercase tracking-wider opacity-70">
             compacting now
@@ -309,10 +309,10 @@ export default function Activity() {
                             </li>
                           )}
                           <li
-                            className={`flex items-baseline gap-3 py-2.5 ${i > 0 ? 'border-t border-ink-7/50' : ''}`}
+                            className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2.5 ${i > 0 ? 'border-t border-ink-7/50' : ''}`}
                           >
                             <span
-                              className="w-20 shrink-0 text-right text-xs text-ink-4"
+                              className="w-12 shrink-0 text-right text-xs text-ink-4 sm:w-20"
                               title={
                                 row.atOldest !== undefined
                                   ? `${formatTime(new Date(row.atOldest).toISOString())} – ${formatTime(new Date(row.at).toISOString())}`
@@ -322,7 +322,7 @@ export default function Activity() {
                               {formatRelative(new Date(row.at).toISOString())}
                             </span>
                             <KindChip kind={row.kind} />
-                            <span className="min-w-0 text-sm text-ink-2">
+                            <span className="min-w-0 flex-1 basis-52 text-sm text-ink-2">
                               {row.text}
                               {row.badge && (
                                 <span className="ml-2">

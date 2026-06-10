@@ -43,7 +43,9 @@ export default function ManifestDetail() {
                 />
               </div>
               <Panel title="Contents">
-                <JsonTree value={m} />
+                <div className="overflow-x-auto">
+                  <JsonTree value={m} />
+                </div>
               </Panel>
             </div>
           )
