@@ -44,9 +44,15 @@ export default function Lsm() {
       <QueryGate query={query}>
         {(lsm) => {
           const hasSegments = lsm.segments.length > 0
+          // In a segmented DB the root tree only matters if something
+          // actually landed there (keys without an extractable prefix);
+          // otherwise hide its tab and default to the first segment.
+          const rootEmpty = lsm.tree.l0.length === 0 && lsm.tree.runs.length === 0
+          const showRoot = !hasSegments || !rootEmpty
+          const effIdx = segmentIdx >= 0 ? segmentIdx : showRoot ? -1 : 0
           const tree: TreeDto =
-            hasSegments && segmentIdx >= 0 && segmentIdx < lsm.segments.length
-              ? lsm.segments[segmentIdx].tree
+            hasSegments && effIdx >= 0 && effIdx < lsm.segments.length
+              ? lsm.segments[effIdx].tree
               : lsm.tree
           const historical = manifestId !== undefined
           return (
@@ -109,16 +115,18 @@ export default function Lsm() {
 
               {hasSegments && (
                 <div className="flex flex-wrap gap-1">
-                  <SegmentTab
-                    label="root"
-                    active={segmentIdx === -1}
-                    onClick={() => setSegmentIdx(-1)}
-                  />
+                  {showRoot && (
+                    <SegmentTab
+                      label="root"
+                      active={effIdx === -1}
+                      onClick={() => setSegmentIdx(-1)}
+                    />
+                  )}
                   {lsm.segments.map((seg, i) => (
                     <SegmentTab
                       key={seg.prefix.hex}
                       label={keyText(seg.prefix)}
-                      active={segmentIdx === i}
+                      active={effIdx === i}
                       onClick={() => setSegmentIdx(i)}
                     />
                   ))}
