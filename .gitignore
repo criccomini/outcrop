@@ -1,5 +1,6 @@
 /target
 /demo-data
+.playwright-cli
 web/node_modules
 web/dist/*
 !web/dist/.gitkeep
