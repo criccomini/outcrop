@@ -6,7 +6,7 @@
 
 use std::collections::VecDeque;
 
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use slatedb::object_store::path::Path;
 use slatedb::object_store::ObjectStore;
 
@@ -26,18 +26,28 @@ impl Default for ScanLimits {
     }
 }
 
+/// Objects probed per `manifest/` dir before giving up. Strays that hide
+/// the numbered manifests must sort before the digits (e.g. `.DS_Store`),
+/// and there are never many of those.
+const DB_ROOT_PROBE_LIMIT: usize = 50;
+
 /// True when `prefix/manifest/` contains at least one `<u64>.manifest`.
-/// Only the first object is probed — manifest dirs hold nothing else.
+/// Listings are lexicographic and strays like `.DS_Store` sort before the
+/// numbered manifests, so a bounded prefix of the listing is scanned
+/// rather than only the first object.
 async fn is_db_root(store: &dyn ObjectStore, manifest_prefix: &Path) -> bool {
-    let mut stream = store.list(Some(manifest_prefix));
-    match stream.try_next().await {
-        Ok(Some(meta)) => meta
+    let mut stream = store.list(Some(manifest_prefix)).take(DB_ROOT_PROBE_LIMIT);
+    while let Ok(Some(meta)) = stream.try_next().await {
+        let is_manifest = meta
             .location
             .filename()
             .and_then(|name| name.strip_suffix(".manifest"))
-            .is_some_and(|stem| stem.parse::<u64>().is_ok()),
-        _ => false,
+            .is_some_and(|stem| stem.parse::<u64>().is_ok());
+        if is_manifest {
+            return true;
+        }
     }
+    false
 }
 
 /// DB root paths under `root`, breadth-first, sorted.
@@ -144,6 +154,19 @@ mod tests {
         let store = store_with(&["app/manifest/readme.txt", "app/data/file.bin"]).await;
         let dbs = discover(&store, "", &limits(4, 2000)).await.unwrap();
         assert!(dbs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn stray_files_in_manifest_dir_do_not_hide_a_db() {
+        // `.DS_Store` sorts before the digits, so a first-object-only probe
+        // would misread this as "not a DB".
+        let store = store_with(&[
+            "db/manifest/.DS_Store",
+            "db/manifest/00000000000000000001.manifest",
+        ])
+        .await;
+        let dbs = discover(&store, "", &limits(4, 2000)).await.unwrap();
+        assert_eq!(dbs, vec!["db"]);
     }
 
     #[tokio::test]
