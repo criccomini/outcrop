@@ -13,6 +13,9 @@ metadata reads, and object listings.
 - **Overview** — health summary: sizes, SST counts, manifest freshness, WAL
   window, epochs, plus a storage & garbage panel (space amplification, bytes
   pinned by checkpoints, and what the GC would reclaim).
+- **Alerts** — health warnings (L0 backlog, WAL window growth, stale
+  manifests, expired checkpoints) in one place, with a count badge in the
+  nav.
 - **LSM Tree** — visual tree: levels by size and key-range coverage
   (overlap reads as read amplification), with per-SST drill-down into block
   index, bloom filter/stats sizes, and content stats.

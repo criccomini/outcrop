@@ -1,35 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useOverview } from '../api/client'
-import type { WarningDto } from '../api/types'
 import { GarbagePanel } from '../components/GarbagePanel'
 import { Stat } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
-
-const WARNING_STYLES: Record<WarningDto['severity'], string> = {
-  error: 'border-red-300 bg-red-50 text-red-800',
-  warn: 'border-accent/40 bg-accent-low text-accent-high',
-  info: 'border-ink-7 bg-surface-2 text-ink-3',
-}
-
-function WarningStrip({ warnings }: { warnings: WarningDto[] }) {
-  if (warnings.length === 0) return null
-  return (
-    <div className="mb-4 space-y-1.5">
-      {warnings.map((w) => (
-        <div
-          key={w.code + w.message}
-          className={`rounded-lg border px-4 py-2 text-sm ${WARNING_STYLES[w.severity]}`}
-        >
-          <span className="mr-2 text-xs font-semibold uppercase tracking-wider opacity-70">
-            {w.severity}
-          </span>
-          {w.message}
-        </div>
-      ))}
-    </div>
-  )
-}
 
 export default function Overview() {
   const query = useOverview()
@@ -54,7 +28,6 @@ export default function Overview() {
                 </span>
               )}
             </div>
-            <WarningStrip warnings={o.warnings} />
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <Stat
                 label="Total size"
