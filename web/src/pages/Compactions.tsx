@@ -138,8 +138,13 @@ export default function Compactions() {
                                 {formatBytes(c.bytes_processed)}
                               </td>
                               <td className="py-1.5 pr-4">{outputsText(c)}</td>
-                              <td className="py-1.5 font-mono text-xs text-ink-4">
-                                {c.id}
+                              <td className="py-1.5 font-mono text-xs">
+                                <Link
+                                  to={dbPath(`/compactions/job/${c.id}`)}
+                                  className="text-accent hover:text-accent-high"
+                                >
+                                  {c.id}
+                                </Link>
                               </td>
                             </tr>
                           )

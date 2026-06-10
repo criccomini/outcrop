@@ -31,6 +31,19 @@ export interface DbRoute {
 
 export function splitDbSplat(splat: string): DbRoute {
   const segs = splat.split('/').filter(Boolean)
+  // compactions/job/<ulid>
+  if (
+    segs.length >= 3 &&
+    segs[segs.length - 3] === 'compactions' &&
+    segs[segs.length - 2] === 'job' &&
+    /^[0-9A-Z]{26}$/i.test(segs[segs.length - 1])
+  ) {
+    return {
+      path: segs.slice(0, -3).join('/'),
+      page: 'compactions/job',
+      arg: segs[segs.length - 1],
+    }
+  }
   const parent = segs[segs.length - 2]
   if (segs.length >= 2 && (parent === 'manifests' || parent === 'compactions')) {
     const last = segs[segs.length - 1]

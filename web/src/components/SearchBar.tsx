@@ -182,16 +182,23 @@ function SearchResults({
             {result.compactions.map((c) => (
               <li key={`${c.job_id}-${c.role}`} className="text-sm">
                 <Link
+                  to={dbUrl(dbId, `/compactions/job/${c.job_id}`)}
+                  onClick={onNavigate}
+                  className="font-mono text-xs text-accent hover:text-accent-high"
+                >
+                  {c.job_id.slice(0, 10)}…
+                </Link>
+                <span className="ml-2 text-xs text-ink-4">
+                  {c.role === 'job' ? 'matched job id' : 'output SST of this job'}
+                  {' · in '}
+                </span>
+                <Link
                   to={dbUrl(dbId, `/compactions/${c.version}`)}
                   onClick={onNavigate}
                   className="font-mono text-xs text-accent hover:text-accent-high"
                 >
                   v{c.version}
                 </Link>
-                <span className="ml-2 text-xs text-ink-4">
-                  {c.role === 'job' ? 'job id' : 'output SST of job'}{' '}
-                  <span className="font-mono">{c.job_id.slice(0, 10)}…</span>
-                </span>
               </li>
             ))}
           </ul>

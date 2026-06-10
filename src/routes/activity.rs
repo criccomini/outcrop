@@ -22,7 +22,9 @@ pub async fn list(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<ActivityDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(20).min(100).max(1);
+    // The cap must stay below the manifest LRU (256) so a full fetch still
+    // warms instead of thrashing it.
+    let limit = params.limit.unwrap_or(20).min(200).max(1);
     let entries = state.manifest_entries().await?;
 
     // The newest `limit` transitions need `limit + 1` manifests.

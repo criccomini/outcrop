@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { useDbPath } from '../api/client'
 import type { CompactionDto } from '../api/types'
 import { keyText } from './KeyDisplay'
 import { StatusBadge } from './StatusBadge'
@@ -36,6 +38,7 @@ export function outputsText(c: CompactionDto): string {
 
 /** The flat job table shared by the compactions list, detail, and diff. */
 export function CompactionJobsTable({ jobs }: { jobs: CompactionDto[] }) {
+  const dbPath = useDbPath()
   if (jobs.length === 0) {
     return <span className="text-sm text-ink-5">no jobs</span>
   }
@@ -77,7 +80,14 @@ export function CompactionJobsTable({ jobs }: { jobs: CompactionDto[] }) {
               )}
               <td className="py-1.5 pr-4">{formatBytes(c.bytes_processed)}</td>
               <td className="py-1.5 pr-4">{outputsText(c)}</td>
-              <td className="py-1.5 font-mono text-xs text-ink-4">{c.id}</td>
+              <td className="py-1.5 font-mono text-xs">
+                <Link
+                  to={dbPath(`/compactions/job/${c.id}`)}
+                  className="text-accent hover:text-accent-high"
+                >
+                  {c.id}
+                </Link>
+              </td>
             </tr>
           )
         })}

@@ -5,6 +5,7 @@ import { splitDbSplat } from '../lib/dbroute'
 import type {
   ActivityDto,
   CheckpointStatusDto,
+  CompactionDto,
   CompactorStateDto,
   DbsDto,
   ExternalDbDto,
@@ -265,6 +266,17 @@ export function useCompactions(limit = 20) {
     queryKey: [db, 'compactions', limit],
     queryFn: () => fetchJson(`${api(db)}/compactions?limit=${limit}`),
     meta: { live: true },
+  })
+}
+
+/** One compactor job by ULID, at its latest recorded state. */
+export function useCompactionJob(ulid: string) {
+  const db = useDbId()
+  return useQuery<CompactionDto, ApiRequestError>({
+    queryKey: [db, 'compaction-job', ulid],
+    queryFn: () => fetchJson(`${api(db)}/compactions/${ulid}`),
+    meta: { live: true }, // active jobs keep updating
+    enabled: ulid !== '',
   })
 }
 

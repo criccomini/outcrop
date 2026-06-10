@@ -23,6 +23,7 @@ import Manifests from './pages/Manifests'
 import ManifestDetail from './pages/ManifestDetail'
 import ManifestDiff from './pages/ManifestDiff'
 import Compactions from './pages/Compactions'
+import CompactionJob from './pages/CompactionJob'
 import CompactionsDiff from './pages/CompactionsDiff'
 import CompactionsVersion from './pages/CompactionsVersion'
 import Checkpoints from './pages/Checkpoints'
@@ -114,6 +115,8 @@ function DbArea() {
       return <CompactionsDiff />
     case 'compactions/id':
       return <CompactionsVersion id={arg ?? ''} />
+    case 'compactions/job':
+      return <CompactionJob id={arg ?? ''} />
     case 'checkpoints':
       return <Checkpoints />
     case 'garbage':

@@ -5,8 +5,13 @@ import {
   useCompactions,
   useCompactorState,
   useDbPath,
+  useGcEvents,
 } from '../api/client'
-import type { ActivityDto, VersionedCompactionsDto } from '../api/types'
+import type {
+  ActivityDto,
+  GcEventDto,
+  VersionedCompactionsDto,
+} from '../api/types'
 import { HelpTip } from '../components/HelpTip'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
@@ -109,13 +114,18 @@ function transitionRows(items: ActivityDto[]): Row[] {
 }
 
 /**
- * Failed compactor jobs in the visible window. Completed jobs are omitted —
- * their result is already in the feed as a compaction transition — and
- * running ones live in the "compacting now" strip instead.
+ * Compactor jobs as feed rows. Failed jobs always appear (they never
+ * produce a transition). Completed jobs appear only for the stretch
+ * BEFORE the oldest visible transition: manifests are GC'd within
+ * minutes under churn, so the .compactions log reaches much further back
+ * than transitions do — without these rows that history would be
+ * invisible. Within the transition window, completed jobs stay hidden
+ * (their transition already tells the story); running ones live in the
+ * "compacting now" strip.
  */
-function failedJobRows(
+function compactionJobRows(
   versions: VersionedCompactionsDto[],
-  oldestAt: number,
+  oldestTransitionAt: number,
 ): Row[] {
   const seen = new Set<string>()
   const rows: Row[] = []
@@ -123,20 +133,63 @@ function failedJobRows(
     for (const c of v.compactions) {
       if (seen.has(c.id)) continue
       seen.add(c.id)
-      if (c.status !== 'failed') continue
       const at = ulidTimeMs(c.id)
-      if (at === null || at < oldestAt) continue
+      if (at === null) continue
+      const include =
+        c.status === 'failed' ? true : !c.active && at < oldestTransitionAt
+      if (!include) continue
       rows.push({
         key: `c${c.id}`,
         at,
         kind: 'compaction',
         text: compactionJobSummary(c),
-        link: { to: '/compactions', label: 'details' },
-        badge: 'failed',
+        link: { to: `/compactions/job/${c.id}`, label: 'job' },
+        badge: c.status === 'failed' ? 'failed' : c.status,
       })
     }
   }
   return rows
+}
+
+const GC_KIND_LABEL = {
+  compacted: 'SST',
+  wal: 'WAL SST',
+  manifest: 'manifest',
+} as const
+
+/**
+ * Observed deletions (the server's listing-diff feed), grouped per
+ * observation window and object kind so a sweep reads as one row per
+ * category rather than hundreds of object lines.
+ */
+function gcDeletionRows(events: GcEventDto[]): Row[] {
+  const groups = new Map<
+    string,
+    { kind: GcEventDto['kind']; at: number; count: number; bytes: number; anomalies: number }
+  >()
+  for (const e of events) {
+    const key = `${e.missing_at}|${e.kind}`
+    const g = groups.get(key) ?? {
+      kind: e.kind,
+      at: Date.parse(e.missing_at),
+      count: 0,
+      bytes: 0,
+      anomalies: 0,
+    }
+    g.count += 1
+    g.bytes += e.size_bytes
+    if (e.referenced === true) g.anomalies += 1
+    groups.set(key, g)
+  }
+  return [...groups.values()].map((g) => ({
+    key: `gcdel-${g.kind}-${g.at}`,
+    at: g.at,
+    kind: 'gc' as FeedKind,
+    text: `deleted ${g.count} ${GC_KIND_LABEL[g.kind]}${plural(g.count)} · ${formatBytes(g.bytes)}${
+      g.anomalies > 0 ? ` · ${g.anomalies} still referenced!` : ''
+    }`,
+    link: { to: '/garbage', label: 'garbage' },
+  }))
 }
 
 /** "3h" style duration for quiet-gap dividers. */
@@ -216,10 +269,12 @@ function FilterBar({
       {/* On this row (right-aligned) rather than in a panel header above. */}
       <span className="ml-auto">
         <HelpTip>
-          Newest first. Runs of consecutive flushes are grouped into one
-          entry; every entry links to its manifest diff. In-flight
-          compactions appear in the strip above the feed, failed ones in the
-          feed; completed compactions show as transitions.
+          Newest first, from three sources: manifest transitions (runs of
+          consecutive flushes grouped, each linking to its diff), the
+          compactor's job log — which reaches further back than transitions,
+          since the GC prunes old manifests within minutes — and GC
+          deletions observed by this server, grouped per sweep. In-flight
+          compactions appear in the strip above the feed.
         </HelpTip>
       </span>
     </div>
@@ -262,8 +317,9 @@ function CompactingNow() {
 }
 
 export default function Activity() {
-  const query = useActivity(50)
-  const compactions = useCompactions()
+  const query = useActivity(150)
+  const compactions = useCompactions(100)
+  const gcEvents = useGcEvents()
   const dbPath = useDbPath()
   const [params, setParams] = useSearchParams()
   const selected = new Set(
@@ -285,11 +341,15 @@ export default function Activity() {
         <QueryGate query={query}>
           {(items) => {
             const all = transitionRows(items)
-            if (all.length > 0) {
-              const oldestAt = Math.min(...all.map((r) => r.atOldest ?? r.at))
-              all.push(...failedJobRows(compactions.data ?? [], oldestAt))
-              all.sort((a, b) => b.at - a.at)
-            }
+            const oldestTransitionAt =
+              all.length > 0
+                ? Math.min(...all.map((r) => r.atOldest ?? r.at))
+                : Number.POSITIVE_INFINITY
+            all.push(
+              ...compactionJobRows(compactions.data ?? [], oldestTransitionAt),
+            )
+            all.push(...gcDeletionRows(gcEvents.data?.events ?? []))
+            all.sort((a, b) => b.at - a.at)
             const counts = new Map<FeedKind, number>()
             for (const r of all) counts.set(r.kind, (counts.get(r.kind) ?? 0) + 1)
             const rows =
