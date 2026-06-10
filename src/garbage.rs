@@ -8,12 +8,12 @@
 //! tree references them. The GC's min-age grace periods are ignored, so
 //! this is the steady-state estimate.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use ulid::Ulid;
 
-use crate::dto::{GarbageCategoryDto, GarbageDto};
+use crate::dto::{GarbageCategoryDto, GarbageDto, GarbagePinnerDto};
 use crate::state::{CompactedEntry, ManifestEntry, WalEntry};
 
 /// The references one manifest version holds: compacted-SST ULIDs across the
@@ -31,11 +31,21 @@ impl ManifestRefs {
     }
 }
 
+/// An unexpired checkpoint, as input to per-checkpoint pinning attribution.
+pub struct CheckpointPin {
+    pub id: String,
+    pub name: Option<String>,
+    pub manifest_id: u64,
+    pub expire_time: Option<DateTime<Utc>>,
+}
+
 pub struct GarbageInputs<'a> {
     pub latest: ManifestRefs,
     /// Manifests referenced by unexpired checkpoints (deduped, latest's own
     /// id excluded).
     pub pinned: Vec<ManifestRefs>,
+    /// All unexpired checkpoints.
+    pub pinned_checkpoints: Vec<CheckpointPin>,
     pub live_checkpoint_count: usize,
     pub expired_checkpoint_count: usize,
     /// Unexpired checkpoints whose manifest no longer exists.
@@ -132,6 +142,50 @@ pub fn compute_garbage(inputs: &GarbageInputs) -> GarbageDto {
         manifests.add(class, entry.size_bytes);
     }
 
+    // Per-checkpoint attribution: data bytes a checkpoint's manifest
+    // references beyond what the latest manifest already keeps alive.
+    // Checkpoints sharing a manifest report the same number — this is a
+    // per-checkpoint view, not a disjoint partition of pinned bytes.
+    let compacted_sizes: HashMap<Ulid, u64> = inputs
+        .compacted_listing
+        .iter()
+        .map(|e| (e.ulid, e.size_bytes))
+        .collect();
+    let refs_by_id: HashMap<u64, &ManifestRefs> =
+        inputs.pinned.iter().map(|m| (m.id, m)).collect();
+    let mut pinners: Vec<GarbagePinnerDto> = inputs
+        .pinned_checkpoints
+        .iter()
+        .map(|cp| {
+            let refs = refs_by_id.get(&cp.manifest_id);
+            let (mut extra_bytes, mut extra_count) = (0u64, 0usize);
+            if let Some(refs) = refs {
+                for u in refs.compacted.difference(&inputs.latest.compacted) {
+                    if let Some(sz) = compacted_sizes.get(u) {
+                        extra_bytes += sz;
+                        extra_count += 1;
+                    }
+                }
+                for w in inputs.wal_listing {
+                    if refs.needs_wal(w.id) && w.id <= inputs.latest.replay_after_wal_id {
+                        extra_bytes += w.size_bytes;
+                        extra_count += 1;
+                    }
+                }
+            }
+            GarbagePinnerDto {
+                id: cp.id.clone(),
+                name: cp.name.clone(),
+                manifest_id: cp.manifest_id,
+                expire_time: cp.expire_time,
+                manifest_available: refs.is_some() || cp.manifest_id >= inputs.latest.id,
+                extra_bytes,
+                extra_count,
+            }
+        })
+        .collect();
+    pinners.sort_by(|a, b| b.extra_bytes.cmp(&a.extra_bytes));
+
     let (compacted, wal, manifests) = (compacted.dto, wal.dto, manifests.dto);
     let stored_bytes = compacted.stored_bytes + wal.stored_bytes + manifests.stored_bytes;
     let live_bytes = compacted.live_bytes + wal.live_bytes + manifests.live_bytes;
@@ -149,6 +203,7 @@ pub fn compute_garbage(inputs: &GarbageInputs) -> GarbageDto {
         live_checkpoint_count: inputs.live_checkpoint_count,
         expired_checkpoint_count: inputs.expired_checkpoint_count,
         dangling_checkpoint_count: inputs.dangling_checkpoint_count,
+        pinners,
         compacted,
         wal,
         manifests,
@@ -215,6 +270,7 @@ mod tests {
         let inputs = GarbageInputs {
             latest: refs(10, &[live], 5, 8),
             pinned: vec![refs(7, &[live, pinned], 3, 6)],
+            pinned_checkpoints: vec![],
             live_checkpoint_count: 1,
             expired_checkpoint_count: 0,
             dangling_checkpoint_count: 0,
@@ -242,6 +298,7 @@ mod tests {
             latest: refs(10, &[], 6, 9),
             // Checkpointed manifest still needs WAL (4, 6).
             pinned: vec![refs(8, &[], 4, 7)],
+            pinned_checkpoints: vec![],
             live_checkpoint_count: 1,
             expired_checkpoint_count: 0,
             dangling_checkpoint_count: 0,
@@ -266,6 +323,7 @@ mod tests {
         let inputs = GarbageInputs {
             latest: refs(5, &[], 0, 1),
             pinned: vec![refs(3, &[], 0, 1)],
+            pinned_checkpoints: vec![],
             live_checkpoint_count: 1,
             expired_checkpoint_count: 2,
             dangling_checkpoint_count: 0,
@@ -292,6 +350,7 @@ mod tests {
         let inputs = GarbageInputs {
             latest: refs(2, &[live], 0, 1),
             pinned: vec![],
+            pinned_checkpoints: vec![],
             live_checkpoint_count: 0,
             expired_checkpoint_count: 0,
             dangling_checkpoint_count: 0,
@@ -307,10 +366,55 @@ mod tests {
     }
 
     #[test]
+    fn pinner_attribution_counts_extra_data_only() {
+        let shared = ulid(1);
+        let pinned_only = ulid(2);
+        let cp = |id: &str, manifest_id: u64| CheckpointPin {
+            id: id.to_string(),
+            name: None,
+            manifest_id,
+            expire_time: None,
+        };
+        let inputs = GarbageInputs {
+            // Latest references `shared` and replays after WAL #6.
+            latest: refs(10, &[shared], 6, 9),
+            // Checkpointed manifest also holds `pinned_only` and WAL (4, 7).
+            pinned: vec![refs(7, &[shared, pinned_only], 4, 7)],
+            pinned_checkpoints: vec![cp("old", 7), cp("at-latest", 10), cp("gone", 3)],
+            live_checkpoint_count: 3,
+            expired_checkpoint_count: 0,
+            dangling_checkpoint_count: 1,
+            compacted_listing: &[
+                compacted_entry(shared, 100, 100),
+                compacted_entry(pinned_only, 40, 100),
+            ],
+            wal_listing: &[
+                wal_entry(5, 10, 100), // in checkpoint window, replayed in latest
+                wal_entry(7, 10, 100), // live in latest — not extra
+            ],
+            manifest_listing: &[],
+        };
+        let out = compute_garbage(&inputs);
+        assert_eq!(out.pinners.len(), 3);
+        // Sorted heaviest first: the old checkpoint pins SST #2 + WAL #5.
+        assert_eq!(out.pinners[0].id, "old");
+        assert_eq!(out.pinners[0].extra_bytes, 50);
+        assert_eq!(out.pinners[0].extra_count, 2);
+        assert!(out.pinners[0].manifest_available);
+        let at_latest = out.pinners.iter().find(|p| p.id == "at-latest").unwrap();
+        assert_eq!(at_latest.extra_bytes, 0);
+        assert!(at_latest.manifest_available);
+        let gone = out.pinners.iter().find(|p| p.id == "gone").unwrap();
+        assert_eq!(gone.extra_bytes, 0);
+        assert!(!gone.manifest_available);
+    }
+
+    #[test]
     fn space_amp_absent_when_nothing_live() {
         let inputs = GarbageInputs {
             latest: refs(1, &[], 0, 1),
             pinned: vec![],
+            pinned_checkpoints: vec![],
             live_checkpoint_count: 0,
             expired_checkpoint_count: 0,
             dangling_checkpoint_count: 0,

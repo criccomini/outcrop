@@ -8,7 +8,7 @@ use ulid::Ulid;
 
 use crate::dto::GarbageDto;
 use crate::error::ApiError;
-use crate::garbage::{compute_garbage, GarbageInputs, ManifestRefs};
+use crate::garbage::{compute_garbage, CheckpointPin, GarbageInputs, ManifestRefs};
 use crate::state::AppState;
 
 /// Compacted-SST ULIDs referenced by a manifest's root tree and segments,
@@ -48,6 +48,7 @@ pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageD
     let now = chrono::Utc::now();
     let mut live_checkpoint_count = 0;
     let mut expired_checkpoint_count = 0;
+    let mut pinned_checkpoints: Vec<CheckpointPin> = Vec::new();
     let mut pinned_ids: BTreeSet<u64> = BTreeSet::new();
     for c in m.checkpoints() {
         if c.expire_time.is_some_and(|t| t <= now) {
@@ -55,6 +56,12 @@ pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageD
             continue;
         }
         live_checkpoint_count += 1;
+        pinned_checkpoints.push(CheckpointPin {
+            id: c.id.to_string(),
+            name: c.name.clone(),
+            manifest_id: c.manifest_id,
+            expire_time: c.expire_time,
+        });
         if c.manifest_id != m.id() {
             pinned_ids.insert(c.manifest_id);
         }
@@ -76,6 +83,7 @@ pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageD
     Ok(Json(compute_garbage(&GarbageInputs {
         latest: manifest_refs(m),
         pinned,
+        pinned_checkpoints,
         live_checkpoint_count,
         expired_checkpoint_count,
         dangling_checkpoint_count,

@@ -8,6 +8,7 @@ import ManifestDetail from './pages/ManifestDetail'
 import ManifestDiff from './pages/ManifestDiff'
 import Compactions from './pages/Compactions'
 import Checkpoints from './pages/Checkpoints'
+import Garbage from './pages/Garbage'
 import Wal from './pages/Wal'
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/manifests', label: 'Manifests' },
   { to: '/compactions', label: 'Compactions' },
   { to: '/checkpoints', label: 'Checkpoints' },
+  { to: '/garbage', label: 'Garbage' },
 ]
 
 export default function App() {
@@ -70,6 +72,7 @@ export default function App() {
           <Route path="/manifests/:id" element={<ManifestDetail />} />
           <Route path="/compactions" element={<Compactions />} />
           <Route path="/checkpoints" element={<Checkpoints />} />
+          <Route path="/garbage" element={<Garbage />} />
         </Routes>
       </main>
     </div>

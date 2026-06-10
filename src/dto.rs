@@ -383,6 +383,22 @@ pub struct GarbageCategoryDto {
     pub reclaimable_bytes: u64,
 }
 
+/// One unexpired checkpoint and how much storage it keeps alive beyond
+/// what the latest manifest already references.
+#[derive(Serialize, Clone, Debug)]
+pub struct GarbagePinnerDto {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub manifest_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expire_time: Option<DateTime<Utc>>,
+    pub manifest_available: bool,
+    /// Data bytes (compacted + WAL) referenced only via this checkpoint.
+    pub extra_bytes: u64,
+    pub extra_count: usize,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct GarbageDto {
     pub manifest_id: u64,
@@ -390,6 +406,8 @@ pub struct GarbageDto {
     pub expired_checkpoint_count: usize,
     /// Unexpired checkpoints whose manifest no longer exists.
     pub dangling_checkpoint_count: usize,
+    /// Unexpired checkpoints, heaviest pinner first.
+    pub pinners: Vec<GarbagePinnerDto>,
     pub compacted: GarbageCategoryDto,
     pub wal: GarbageCategoryDto,
     pub manifests: GarbageCategoryDto,

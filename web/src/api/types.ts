@@ -301,11 +301,22 @@ export interface GarbageCategoryDto {
   reclaimable_bytes: number
 }
 
+export interface GarbagePinnerDto {
+  id: string
+  name?: string
+  manifest_id: number
+  expire_time?: string
+  manifest_available: boolean
+  extra_bytes: number
+  extra_count: number
+}
+
 export interface GarbageDto {
   manifest_id: number
   live_checkpoint_count: number
   expired_checkpoint_count: number
   dangling_checkpoint_count: number
+  pinners: GarbagePinnerDto[]
   compacted: GarbageCategoryDto
   wal: GarbageCategoryDto
   manifests: GarbageCategoryDto

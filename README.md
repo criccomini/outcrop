@@ -22,6 +22,8 @@ metadata reads, and object listings.
   versions.
 - **Checkpoints** — checkpoint table with expiry countdowns, and clone
   lineage (parent path, shared SSTs, detached or not).
+- **Garbage** — GC health: live / pinned / reclaimable breakdown, which
+  checkpoints keep how much storage alive, and recent GC sweeps.
 
 ## Running
 

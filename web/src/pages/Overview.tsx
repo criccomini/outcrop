@@ -137,7 +137,16 @@ export default function Overview() {
         )}
       </QueryGate>
       <div className="mt-6">
-        <GarbagePanel />
+        <GarbagePanel
+          action={
+            <Link
+              to="/garbage"
+              className="text-xs text-accent hover:text-accent-high"
+            >
+              details →
+            </Link>
+          }
+        />
       </div>
     </div>
   )

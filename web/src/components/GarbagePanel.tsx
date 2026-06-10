@@ -66,10 +66,10 @@ function CategoryRow({ label, c }: { label: string; c: GarbageCategoryDto }) {
   )
 }
 
-export function GarbagePanel() {
+export function GarbagePanel({ action }: { action?: React.ReactNode }) {
   const query = useGarbage()
   return (
-    <Panel title="Storage &amp; garbage">
+    <Panel title="Storage &amp; garbage" action={action}>
       <QueryGate query={query}>
         {(g) => (
           <div>
