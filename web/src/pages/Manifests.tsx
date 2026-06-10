@@ -8,13 +8,14 @@ import { formatBytes, formatRelative } from '../lib/format'
 export default function Manifests() {
   const query = useManifests()
   const navigate = useNavigate()
+  // In pick order, capped at two: a third pick replaces the oldest one.
   const [picked, setPicked] = useState<number[]>([])
+  // The diff itself is always oldest → newest.
+  const [a, b] = [...picked].sort((x, y) => x - y)
 
   function toggle(id: number) {
     setPicked((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev.slice(-1), id].sort((x, y) => x - y),
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev.slice(-1), id],
     )
   }
 
@@ -24,12 +25,10 @@ export default function Manifests() {
         <h1 className="text-3xl">Manifests</h1>
         <button
           disabled={picked.length !== 2}
-          onClick={() =>
-            navigate(`/manifests/diff?a=${picked[0]}&b=${picked[1]}`)
-          }
+          onClick={() => navigate(`/manifests/diff?a=${a}&b=${b}`)}
           className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-high disabled:cursor-not-allowed disabled:bg-ink-6"
         >
-          Diff {picked.length === 2 ? `#${picked[0]} → #${picked[1]}` : 'two versions'}
+          Diff {picked.length === 2 ? `#${a} → #${b}` : 'two versions'}
         </button>
       </div>
       <div className="mt-6">
