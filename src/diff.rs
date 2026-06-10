@@ -171,6 +171,42 @@ fn run_summary(run: &SortedRunDto) -> SortedRunSummaryDto {
     }
 }
 
+fn sst_delta(ssts: &[SstViewDto]) -> SstDeltaDto {
+    SstDeltaDto {
+        count: ssts.len(),
+        bytes: ssts.iter().map(|s| s.est_bytes).sum(),
+    }
+}
+
+/// Collapse a full diff into the aggregate shape the activity feed ships:
+/// counts and byte sums instead of per-SST lists, so a transition's payload
+/// is bounded no matter how many SSTs a compaction touched.
+pub fn summarize_diff(d: &ManifestDiffDto) -> DiffSummaryDto {
+    DiffSummaryDto {
+        l0_added: sst_delta(&d.l0_added),
+        l0_removed: sst_delta(&d.l0_removed),
+        runs_added: d.runs_added.clone(),
+        runs_removed: d.runs_removed.clone(),
+        runs_changed: d
+            .runs_changed
+            .iter()
+            .map(|r| RunChangeSummaryDto {
+                id: r.id,
+                added: sst_delta(&r.ssts_added),
+                removed: sst_delta(&r.ssts_removed),
+            })
+            .collect(),
+        segments_added: d.segments_added.len(),
+        segments_removed: d.segments_removed.len(),
+        checkpoints_added: d.checkpoints_added.clone(),
+        checkpoints_removed: d.checkpoints_removed.clone(),
+        checkpoints_changed: d.checkpoints_changed.len(),
+        external_dbs_added: d.external_dbs_added.len(),
+        external_dbs_removed: d.external_dbs_removed.len(),
+        scalars: d.scalars.clone(),
+    }
+}
+
 /// Added/removed SSTs between two lists, keyed by view id.
 fn diff_ssts(a: &[SstViewDto], b: &[SstViewDto]) -> (Vec<SstViewDto>, Vec<SstViewDto>) {
     let a_ids: BTreeSet<&str> = a.iter().map(|s| s.view_id.as_str()).collect();
@@ -315,5 +351,35 @@ mod tests {
         assert!(fields.contains(&"next_wal_sst_id"));
         assert!(fields.contains(&"writer_epoch"));
         assert_eq!(fields.len(), 2);
+    }
+
+    #[test]
+    fn summarize_collapses_sst_lists_to_counts_and_bytes() {
+        let a = manifest(
+            1,
+            vec![sst("a", 10), sst("b", 30)],
+            vec![run(1, vec![sst("x", 5), sst("y", 5)])],
+        );
+        let b = manifest(
+            2,
+            vec![],
+            vec![run(1, vec![sst("x", 5), sst("z", 50)]), run(2, vec![sst("c", 40)])],
+        );
+        let s = summarize_diff(&diff_manifests(&a, &b));
+        assert_eq!(s.l0_removed, SstDeltaDto { count: 2, bytes: 40 });
+        assert_eq!(s.l0_added, SstDeltaDto { count: 0, bytes: 0 });
+        assert_eq!(s.runs_added.len(), 1);
+        assert_eq!(s.runs_added[0].id, 2);
+        assert_eq!(s.runs_changed.len(), 1);
+        assert_eq!(
+            s.runs_changed[0],
+            RunChangeSummaryDto {
+                id: 1,
+                added: SstDeltaDto { count: 1, bytes: 50 },
+                removed: SstDeltaDto { count: 1, bytes: 5 },
+            }
+        );
+        assert_eq!(s.checkpoints_changed, 0);
+        assert_eq!(s.segments_added, 0);
     }
 }

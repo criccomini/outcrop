@@ -390,11 +390,48 @@ pub struct WalSstDto {
 pub struct WalDto {
     pub next_wal_sst_id: u64,
     pub replay_after_wal_id: u64,
+    /// Across all WAL SSTs, not just the returned page.
     pub total_bytes: u64,
+    pub total_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wal_object_store_uri: Option<String>,
-    /// Newest first.
+    /// Newest first, truncated to the requested limit.
     pub entries: Vec<WalSstDto>,
+}
+
+/// Aggregate view of one SST-list change: enough for a feed line.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct SstDeltaDto {
+    pub count: usize,
+    pub bytes: u64,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct RunChangeSummaryDto {
+    pub id: u32,
+    pub added: SstDeltaDto,
+    pub removed: SstDeltaDto,
+}
+
+/// Aggregate manifest diff for the activity feed: the same classification
+/// signal as [`ManifestDiffDto`] without the per-SST lists, so payloads
+/// stay bounded however churny the transition. The full diff is one click
+/// away on the manifest-diff page.
+#[derive(Serialize, Clone, Debug)]
+pub struct DiffSummaryDto {
+    pub l0_added: SstDeltaDto,
+    pub l0_removed: SstDeltaDto,
+    pub runs_added: Vec<SortedRunSummaryDto>,
+    pub runs_removed: Vec<SortedRunSummaryDto>,
+    pub runs_changed: Vec<RunChangeSummaryDto>,
+    pub segments_added: usize,
+    pub segments_removed: usize,
+    pub checkpoints_added: Vec<CheckpointDto>,
+    pub checkpoints_removed: Vec<CheckpointDto>,
+    pub checkpoints_changed: usize,
+    pub external_dbs_added: usize,
+    pub external_dbs_removed: usize,
+    pub scalars: Vec<ScalarChangeDto>,
 }
 
 /// One manifest transition (a → b) in the activity feed.
@@ -404,7 +441,7 @@ pub struct ActivityDto {
     pub b: u64,
     /// When manifest `b` was written.
     pub at: DateTime<Utc>,
-    pub diff: ManifestDiffDto,
+    pub diff: DiffSummaryDto,
 }
 
 #[derive(Serialize, Clone, Debug)]

@@ -1,13 +1,25 @@
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::Json;
+use serde::Deserialize;
 
 use crate::dto::{WalDto, WalSstDto};
 use crate::error::ApiError;
 use crate::state::AppState;
 
-pub async fn wal(State(state): State<Arc<AppState>>) -> Result<Json<WalDto>, ApiError> {
+#[derive(Deserialize)]
+pub struct WalParams {
+    limit: Option<usize>,
+}
+
+pub async fn wal(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<WalParams>,
+) -> Result<Json<WalDto>, ApiError> {
+    // The listing is already cached, so the limit only bounds the payload —
+    // a GC-less DB can accumulate WAL SSTs without bound.
+    let limit = params.limit.unwrap_or(200).min(2000).max(1);
     let manifest = state.latest_manifest().await?;
     let Some(m) = manifest.as_ref() else {
         return Err(ApiError::NotFound(format!(
@@ -18,20 +30,22 @@ pub async fn wal(State(state): State<Arc<AppState>>) -> Result<Json<WalDto>, Api
 
     let entries = state.wal_entries().await?;
     let total_bytes = entries.iter().map(|e| e.size_bytes).sum();
-    let mut ssts: Vec<WalSstDto> = entries
+    let ssts: Vec<WalSstDto> = entries
         .iter()
+        .rev()
+        .take(limit)
         .map(|e| WalSstDto {
             id: e.id,
             size_bytes: e.size_bytes,
             last_modified: e.last_modified,
         })
         .collect();
-    ssts.reverse();
 
     Ok(Json(WalDto {
         next_wal_sst_id: m.next_wal_sst_id(),
         replay_after_wal_id: m.replay_after_wal_id(),
         total_bytes,
+        total_count: entries.len(),
         wal_object_store_uri: m.wal_object_store_uri().map(|s| s.to_string()),
         entries: ssts,
     }))

@@ -305,16 +305,48 @@ export interface WalSstDto {
 export interface WalDto {
   next_wal_sst_id: number
   replay_after_wal_id: number
+  /** Across all WAL SSTs, not just the returned page. */
   total_bytes: number
+  total_count: number
   wal_object_store_uri?: string
+  /** Newest first, truncated to the requested limit. */
   entries: WalSstDto[]
+}
+
+/** Aggregate view of one SST-list change: enough for a feed line. */
+export interface SstDeltaDto {
+  count: number
+  bytes: number
+}
+
+export interface RunChangeSummaryDto {
+  id: number
+  added: SstDeltaDto
+  removed: SstDeltaDto
+}
+
+/** ManifestDiffDto collapsed to counts and byte sums for the feed. */
+export interface DiffSummaryDto {
+  l0_added: SstDeltaDto
+  l0_removed: SstDeltaDto
+  runs_added: SortedRunSummaryDto[]
+  runs_removed: SortedRunSummaryDto[]
+  runs_changed: RunChangeSummaryDto[]
+  segments_added: number
+  segments_removed: number
+  checkpoints_added: CheckpointDto[]
+  checkpoints_removed: CheckpointDto[]
+  checkpoints_changed: number
+  external_dbs_added: number
+  external_dbs_removed: number
+  scalars: ScalarChangeDto[]
 }
 
 export interface ActivityDto {
   a: number
   b: number
   at: string
-  diff: ManifestDiffDto
+  diff: DiffSummaryDto
 }
 
 export interface HealthDto {

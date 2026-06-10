@@ -245,12 +245,13 @@ export function useSst(ulid: string | null) {
   })
 }
 
-export function useWal() {
+export function useWal(limit = 200) {
   const db = useDbId()
   return useQuery<WalDto, ApiRequestError>({
-    queryKey: [db, 'wal'],
-    queryFn: () => fetchJson(`${api(db)}/wal`),
+    queryKey: [db, 'wal', limit],
+    queryFn: () => fetchJson(`${api(db)}/wal?limit=${limit}`),
     meta: { live: true },
+    placeholderData: keepPreviousData,
   })
 }
 

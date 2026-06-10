@@ -6,8 +6,12 @@ import { QueryGate } from '../components/QueryGate'
 import { WalSstDrawer } from '../components/WalSstDrawer'
 import { formatBytes, formatRelative, formatTime } from '../lib/format'
 
+/** Server cap on one page of WAL entries. */
+const WAL_LIMIT_MAX = 2000
+
 export default function Wal() {
-  const query = useWal()
+  const [limit, setLimit] = useState(200)
+  const query = useWal(limit)
   const [selected, setSelected] = useState<number | null>(null)
   return (
     <div>
@@ -23,7 +27,7 @@ export default function Wal() {
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Stat
                   label="WAL SSTs"
-                  value={wal.entries.length.toLocaleString()}
+                  value={wal.total_count.toLocaleString()}
                   sub={`${formatBytes(wal.total_bytes)} total`}
                 />
                 <Stat
@@ -52,7 +56,7 @@ export default function Wal() {
               </div>
 
               <Panel
-                title={`WAL SSTs (${wal.entries.length})`}
+                title={`WAL SSTs (${wal.total_count.toLocaleString()})`}
                 action={
                   <HelpTip>
                     Newest first. Un-replayed SSTs (id above the replay
@@ -117,6 +121,23 @@ export default function Wal() {
                       })}
                     </tbody>
                   </table>
+                  {wal.entries.length < wal.total_count &&
+                    (limit < WAL_LIMIT_MAX ? (
+                      <button
+                        onClick={() =>
+                          setLimit((l) => Math.min(l + 500, WAL_LIMIT_MAX))
+                        }
+                        className="mt-3 text-sm text-accent hover:text-accent-high"
+                      >
+                        Show more ({wal.entries.length.toLocaleString()} of{' '}
+                        {wal.total_count.toLocaleString()})
+                      </button>
+                    ) : (
+                      <p className="mt-3 text-xs text-ink-5">
+                        Showing the newest {wal.entries.length.toLocaleString()}{' '}
+                        of {wal.total_count.toLocaleString()} WAL SSTs.
+                      </p>
+                    ))}
                   </div>
                 )}
               </Panel>

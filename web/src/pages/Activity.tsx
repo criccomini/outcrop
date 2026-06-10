@@ -76,13 +76,14 @@ function transitionRows(items: ActivityDto[]): Row[] {
     if (run.length === 0) return
     const newest = run[0]
     const oldest = run[run.length - 1]
-    const l0 = run.flatMap((it) => it.diff.l0_added)
+    const l0Count = sum(run.map((it) => it.diff.l0_added.count))
+    const l0Bytes = sum(run.map((it) => it.diff.l0_added.bytes))
     const row: Row = {
       key: `t${newest.b}`,
       at: Date.parse(newest.at),
-      kind: l0.length ? 'flush' : 'meta',
-      text: l0.length
-        ? `${l0.length} L0 SST${plural(l0.length)} flushed · ${formatBytes(sum(l0.map((s) => s.est_bytes)))}`
+      kind: l0Count ? 'flush' : 'meta',
+      text: l0Count
+        ? `${l0Count} L0 SST${plural(l0Count)} flushed · ${formatBytes(l0Bytes)}`
         : `${run.length} bookkeeping update${plural(run.length)} (scalars only)`,
       link: {
         to: `/manifests/diff?a=${oldest.a}&b=${newest.b}`,

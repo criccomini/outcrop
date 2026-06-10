@@ -175,6 +175,10 @@ pub struct AppState {
     /// Summaries are pure functions of an immutable manifest, keyed by
     /// (manifest id, requested segment index; -1 = root/auto).
     pub lsm_summaries: LruMap<(u64, i64), LsmSummaryDto>,
+    /// Activity transitions, keyed (a, b): a diff of two immutable
+    /// manifests never changes, so steady-state polls only compute pairs
+    /// they have not seen before.
+    pub activity_cache: LruMap<(u64, u64), crate::dto::ActivityDto>,
     pub gc_observer: std::sync::Mutex<GcObserver>,
 }
 
@@ -202,6 +206,7 @@ impl AppState {
             manifest_by_id: LruMap::new(256),
             sst_details: LruMap::new(64),
             lsm_summaries: LruMap::new(128),
+            activity_cache: LruMap::new(512),
             gc_observer: std::sync::Mutex::new(GcObserver::new()),
         }
     }

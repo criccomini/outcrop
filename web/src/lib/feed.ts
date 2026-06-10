@@ -1,4 +1,4 @@
-import type { CheckpointDto, CompactionDto, ManifestDiffDto } from '../api/types'
+import type { CheckpointDto, CompactionDto, DiffSummaryDto } from '../api/types'
 import { formatBytes } from './format'
 
 /** Category of a feed entry, used for the chip rail on the Activity page. */
@@ -11,30 +11,30 @@ function checkpointLabel(c: CheckpointDto): string {
   return c.name ? `'${c.name}'` : c.id.slice(0, 8)
 }
 
-function structuralChanges(d: ManifestDiffDto): number {
+function structuralChanges(d: DiffSummaryDto): number {
   return (
-    d.l0_removed.length +
+    d.l0_removed.count +
     d.runs_added.length +
     d.runs_removed.length +
     d.runs_changed.length +
-    d.segments_added.length +
-    d.segments_removed.length +
+    d.segments_added +
+    d.segments_removed +
     d.checkpoints_added.length +
     d.checkpoints_removed.length +
-    d.checkpoints_changed.length +
-    d.external_dbs_added.length +
-    d.external_dbs_removed.length
+    d.checkpoints_changed +
+    d.external_dbs_added +
+    d.external_dbs_removed
   )
 }
 
 /** True when the transition only adds L0 SSTs (plus scalar bookkeeping). */
-export function isPureFlush(d: ManifestDiffDto): boolean {
-  return d.l0_added.length > 0 && structuralChanges(d) === 0
+export function isPureFlush(d: DiffSummaryDto): boolean {
+  return d.l0_added.count > 0 && structuralChanges(d) === 0
 }
 
 /** True when nothing but scalar fields moved. */
-export function isScalarOnly(d: ManifestDiffDto): boolean {
-  return d.l0_added.length === 0 && structuralChanges(d) === 0
+export function isScalarOnly(d: DiffSummaryDto): boolean {
+  return d.l0_added.count === 0 && structuralChanges(d) === 0
 }
 
 /**
@@ -43,25 +43,24 @@ export function isScalarOnly(d: ManifestDiffDto): boolean {
  * the GC.
  */
 export function classify(
-  d: ManifestDiffDto,
+  d: DiffSummaryDto,
   at?: string,
 ): { kind: FeedKind; text: string } {
   const kinds = new Set<FeedKind>()
   const parts: string[] = []
 
-  if (d.l0_added.length) {
+  if (d.l0_added.count) {
     kinds.add('flush')
-    const bytes = sum(d.l0_added.map((s) => s.est_bytes))
     parts.push(
-      `${d.l0_added.length} L0 SST${plural(d.l0_added.length)} flushed · ${formatBytes(bytes)}`,
+      `${d.l0_added.count} L0 SST${plural(d.l0_added.count)} flushed · ${formatBytes(d.l0_added.bytes)}`,
     )
   }
 
   // A compaction reads as sources (removed L0s and/or removed runs) flowing
   // into destinations (added runs, or existing runs that changed).
   const sources: string[] = []
-  if (d.l0_removed.length)
-    sources.push(`${d.l0_removed.length} L0 SST${plural(d.l0_removed.length)}`)
+  if (d.l0_removed.count)
+    sources.push(`${d.l0_removed.count} L0 SST${plural(d.l0_removed.count)}`)
   sources.push(...d.runs_removed.map((r) => `SR ${r.id}`))
   const dests = [
     ...d.runs_added.map((r) => `SR ${r.id}`),
@@ -70,16 +69,15 @@ export function classify(
   if (sources.length && dests.length) {
     kinds.add('compaction')
     const bytesIn =
-      sum(d.l0_removed.map((s) => s.est_bytes)) +
-      sum(d.runs_removed.map((r) => r.est_bytes))
+      d.l0_removed.bytes + sum(d.runs_removed.map((r) => r.est_bytes))
     const bytesOut = sum(d.runs_added.map((r) => r.est_bytes))
     let line = `${sources.join(' + ')} → ${dests.join(', ')} · ${formatBytes(bytesIn)} in`
     if (bytesOut > 0) line += `, ${formatBytes(bytesOut)} out`
     parts.push(line)
   } else {
-    if (d.l0_removed.length) {
+    if (d.l0_removed.count) {
       kinds.add('compaction')
-      parts.push(`${d.l0_removed.length} L0 SSTs removed`)
+      parts.push(`${d.l0_removed.count} L0 SSTs removed`)
     }
     if (d.runs_added.length) {
       kinds.add('compaction')
@@ -95,12 +93,10 @@ export function classify(
     }
   }
 
-  if (d.segments_added.length)
-    parts.push(`${d.segments_added.length} segment${plural(d.segments_added.length)} added`)
-  if (d.segments_removed.length)
-    parts.push(
-      `${d.segments_removed.length} segment${plural(d.segments_removed.length)} removed`,
-    )
+  if (d.segments_added)
+    parts.push(`${d.segments_added} segment${plural(d.segments_added)} added`)
+  if (d.segments_removed)
+    parts.push(`${d.segments_removed} segment${plural(d.segments_removed)} removed`)
 
   if (d.checkpoints_added.length) {
     kinds.add('checkpoint')
@@ -133,23 +129,23 @@ export function classify(
       )
     }
   }
-  if (d.checkpoints_changed.length) {
+  if (d.checkpoints_changed) {
     kinds.add('checkpoint')
     parts.push(
-      `${d.checkpoints_changed.length} checkpoint${plural(d.checkpoints_changed.length)} changed`,
+      `${d.checkpoints_changed} checkpoint${plural(d.checkpoints_changed)} changed`,
     )
   }
 
-  if (d.external_dbs_added.length) {
+  if (d.external_dbs_added) {
     kinds.add('clone')
     parts.push(
-      `${d.external_dbs_added.length} clone parent${plural(d.external_dbs_added.length)} linked`,
+      `${d.external_dbs_added} clone parent${plural(d.external_dbs_added)} linked`,
     )
   }
-  if (d.external_dbs_removed.length) {
+  if (d.external_dbs_removed) {
     kinds.add('clone')
     parts.push(
-      `${d.external_dbs_removed.length} clone parent${plural(d.external_dbs_removed.length)} unlinked`,
+      `${d.external_dbs_removed} clone parent${plural(d.external_dbs_removed)} unlinked`,
     )
   }
 
