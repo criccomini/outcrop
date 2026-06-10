@@ -1,41 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
-import type { QueryClient } from '@tanstack/react-query'
-
-/**
- * The soonest auto-refetch among actively observed queries (and the poll
- * interval it runs on), or null when nothing on the current page polls.
- * `refetchInterval` lives on each query's observers, which react-query's
- * types keep private — hence the structural cast.
- */
-function nextRefresh(
-  queryClient: QueryClient,
-): { at: number; interval: number } | null {
-  let next: { at: number; interval: number } | null = null
-  for (const q of queryClient.getQueryCache().getAll()) {
-    if (q.getObserversCount() === 0 || q.state.dataUpdatedAt === 0) continue
-    const { observers } = q as unknown as {
-      observers: { options: { refetchInterval?: number | false } }[]
-    }
-    let interval: number | null = null
-    for (const o of observers ?? []) {
-      if (typeof o.options.refetchInterval === 'number') {
-        interval = Math.min(interval ?? o.options.refetchInterval, o.options.refetchInterval)
-      }
-    }
-    if (interval === null) continue
-    const at = q.state.dataUpdatedAt + interval
-    if (next === null || at < next.at) next = { at, interval }
-  }
-  return next
-}
+import {
+  getNextLiveTickAt,
+  LIVE_REFETCH_MS,
+  refreshLiveNow,
+} from '../api/client'
 
 const R = 8
 const CIRCUMFERENCE = 2 * Math.PI * R
 
 /**
- * Header dial counting down to the next auto-refresh: the ring depletes as
- * the refetch approaches and spins while one is in flight.
+ * Header dial counting down to the next live-data heartbeat (one shared
+ * beat for every polling query, so navigation never resets or staggers
+ * it): the ring depletes as the beat approaches and spins while a refetch
+ * is in flight. Clicking refreshes immediately and restarts the beat.
  */
 export function RefreshTimer() {
   const queryClient = useQueryClient()
@@ -43,15 +21,18 @@ export function RefreshTimer() {
   const [state, setState] = useState<{ secs: number; frac: number } | null>(null)
   useEffect(() => {
     const tick = () => {
-      const next = nextRefresh(queryClient)
-      if (next === null) {
+      const hasLive = queryClient
+        .getQueryCache()
+        .getAll()
+        .some((q) => q.getObserversCount() > 0 && q.meta?.live === true)
+      if (!hasLive) {
         setState(null)
         return
       }
-      const remaining = Math.max(0, next.at - Date.now())
+      const remaining = Math.max(0, getNextLiveTickAt() - Date.now())
       setState({
         secs: Math.ceil(remaining / 1000),
-        frac: Math.min(1, remaining / next.interval),
+        frac: Math.min(1, remaining / LIVE_REFETCH_MS),
       })
     }
     tick()
@@ -62,7 +43,7 @@ export function RefreshTimer() {
   const frac = fetching > 0 ? 0.25 : (state?.frac ?? 0)
   return (
     <button
-      onClick={() => queryClient.refetchQueries({ type: 'active' })}
+      onClick={() => refreshLiveNow(queryClient)}
       className="relative inline-block h-[22px] w-[22px] shrink-0 cursor-pointer"
       title="Auto-refreshes when the ring empties — click to refresh now"
       aria-label="Refresh now"

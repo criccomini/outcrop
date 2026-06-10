@@ -57,8 +57,44 @@ async function fetchJson<T>(url: string): Promise<T> {
 /** Poll interval for pages that track live DB state. */
 export const LIVE_REFETCH_MS = 10_000
 
-/** Poll interval for DB discovery. */
-export const DBS_REFETCH_MS = 30_000
+// All live queries (meta.live) refresh together on one heartbeat instead of
+// each query keeping its own staggered refetchInterval. That keeps the
+// header's countdown ring meaningful: one beat, one spin, one reset —
+// regardless of when individual pages mounted their queries.
+let liveTimer: ReturnType<typeof setTimeout> | undefined
+let nextLiveTickAt = 0
+let pollingClient: QueryClient | null = null
+
+/** When the next live-data heartbeat fires (ms since epoch). */
+export function getNextLiveTickAt(): number {
+  return nextLiveTickAt
+}
+
+function fireLiveTick(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({
+    refetchType: 'active',
+    predicate: (q) => q.meta?.live === true,
+  })
+  scheduleLiveTick(queryClient)
+}
+
+function scheduleLiveTick(queryClient: QueryClient) {
+  clearTimeout(liveTimer)
+  nextLiveTickAt = Date.now() + LIVE_REFETCH_MS
+  liveTimer = setTimeout(() => fireLiveTick(queryClient), LIVE_REFETCH_MS)
+}
+
+/** Starts the heartbeat; idempotent (StrictMode double-invokes effects). */
+export function startLivePolling(queryClient: QueryClient): void {
+  if (pollingClient === queryClient) return
+  pollingClient = queryClient
+  scheduleLiveTick(queryClient)
+}
+
+/** Refreshes all live queries immediately and restarts the beat. */
+export function refreshLiveNow(queryClient: QueryClient): void {
+  fireLiveTick(queryClient)
+}
 
 /**
  * The active DB id from the /db/:dbId route (react-router decodes the
@@ -91,7 +127,7 @@ export function useDbs() {
   return useQuery<DbsDto, ApiRequestError>({
     queryKey: ['dbs'],
     queryFn: () => fetchJson('/api/dbs'),
-    refetchInterval: DBS_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -106,7 +142,7 @@ export function useOverview(dbId?: string) {
   return useQuery<OverviewDto, ApiRequestError>({
     queryKey: [db, 'overview'],
     queryFn: () => fetchJson(`${api(db)}/overview`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
     enabled: db !== '',
   })
 }
@@ -126,7 +162,7 @@ export function useLsm(manifestId?: number) {
           ? `${api(db)}/lsm`
           : `${api(db)}/lsm?manifest_id=${manifestId}`,
       ),
-    refetchInterval: manifestId === undefined ? LIVE_REFETCH_MS : false,
+    meta: manifestId === undefined ? { live: true } : undefined,
     placeholderData: keepPreviousData,
   })
 }
@@ -136,7 +172,7 @@ export function useManifestIds() {
   return useQuery<ManifestIdDto[], ApiRequestError>({
     queryKey: [db, 'manifest-ids'],
     queryFn: () => fetchJson(`${api(db)}/manifests/ids`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -145,7 +181,7 @@ export function useActivity(limit = 20) {
   return useQuery<ActivityDto[], ApiRequestError>({
     queryKey: [db, 'activity', limit],
     queryFn: () => fetchJson(`${api(db)}/activity?limit=${limit}`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -154,7 +190,7 @@ export function useManifests(limit = 50) {
   return useQuery<ManifestSummaryDto[], ApiRequestError>({
     queryKey: [db, 'manifests', limit],
     queryFn: () => fetchJson(`${api(db)}/manifests?limit=${limit}`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -163,6 +199,7 @@ export function useManifest(id: string) {
   return useQuery<ManifestDto, ApiRequestError>({
     queryKey: [db, 'manifest', id],
     queryFn: () => fetchJson(`${api(db)}/manifests/${id}`),
+    staleTime: Infinity, // immutable once written
   })
 }
 
@@ -171,6 +208,7 @@ export function useManifestDiff(a: number, b: number) {
   return useQuery<ManifestDiffDto, ApiRequestError>({
     queryKey: [db, 'manifest-diff', a, b],
     queryFn: () => fetchJson(`${api(db)}/manifests/diff?a=${a}&b=${b}`),
+    staleTime: Infinity, // immutable once written
   })
 }
 
@@ -180,6 +218,7 @@ export function useSst(ulid: string | null) {
     queryKey: [db, 'sst', ulid],
     queryFn: () => fetchJson(`${api(db)}/ssts/${ulid}`),
     enabled: ulid !== null,
+    staleTime: Infinity, // immutable once written
   })
 }
 
@@ -188,7 +227,7 @@ export function useWal() {
   return useQuery<WalDto, ApiRequestError>({
     queryKey: [db, 'wal'],
     queryFn: () => fetchJson(`${api(db)}/wal`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -197,7 +236,7 @@ export function useCompactorState() {
   return useQuery<CompactorStateDto, ApiRequestError>({
     queryKey: [db, 'compactor-state'],
     queryFn: () => fetchJson(`${api(db)}/compactor/state`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -206,7 +245,7 @@ export function useCompactions(limit = 20) {
   return useQuery<VersionedCompactionsDto[], ApiRequestError>({
     queryKey: [db, 'compactions', limit],
     queryFn: () => fetchJson(`${api(db)}/compactions?limit=${limit}`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -215,7 +254,7 @@ export function useCheckpoints() {
   return useQuery<CheckpointStatusDto[], ApiRequestError>({
     queryKey: [db, 'checkpoints'],
     queryFn: () => fetchJson(`${api(db)}/checkpoints`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
   })
 }
 
@@ -232,7 +271,7 @@ export function useGarbage(dbId?: string) {
   return useQuery<GarbageDto, ApiRequestError>({
     queryKey: [db, 'garbage'],
     queryFn: () => fetchJson(`${api(db)}/garbage`),
-    refetchInterval: LIVE_REFETCH_MS,
+    meta: { live: true },
     enabled: db !== '',
   })
 }
