@@ -22,6 +22,8 @@ get /lsm | jq -e '.tree | has("l0") and has("runs")' > /dev/null || fail "lsm sh
 get /wal | jq -e 'has("next_wal_sst_id") and (.entries | type == "array")' > /dev/null || fail "wal shape"
 
 LATEST=$(get /overview | jq .manifest_id)
+get /manifests/ids | jq -e 'length >= 1' > /dev/null || fail "manifest ids"
+get "/lsm?manifest_id=$LATEST" | jq -e ".manifest_id == $LATEST" > /dev/null || fail "lsm time travel"
 get "/manifests?limit=10" | jq -e 'length >= 1' > /dev/null || fail "manifests list"
 get "/manifests/$LATEST" | jq -e ".id == $LATEST" > /dev/null || fail "manifest by id"
 get /manifests/latest | jq -e ".id == $LATEST" > /dev/null || fail "manifest latest"

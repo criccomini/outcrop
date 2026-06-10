@@ -86,6 +86,11 @@ export interface ManifestDto {
   external_dbs: ExternalDbDto[]
 }
 
+export interface ManifestIdDto {
+  id: number
+  last_modified: string
+}
+
 export interface ManifestSummaryDto {
   id: number
   last_modified?: string

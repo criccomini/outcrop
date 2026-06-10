@@ -6,9 +6,26 @@ use serde::Deserialize;
 
 use crate::convert;
 use crate::diff::diff_manifests;
-use crate::dto::{ManifestDiffDto, ManifestDto, ManifestSummaryDto};
+use crate::dto::{ManifestDiffDto, ManifestDto, ManifestIdDto, ManifestSummaryDto};
 use crate::error::ApiError;
 use crate::state::AppState;
+
+/// All retained manifest ids with timestamps, ascending. Served straight
+/// from the cached listing — zero per-manifest GETs, unlike `list`.
+pub async fn ids(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<ManifestIdDto>>, ApiError> {
+    let entries = state.manifest_entries().await?;
+    Ok(Json(
+        entries
+            .iter()
+            .map(|e| ManifestIdDto {
+                id: e.id,
+                last_modified: e.last_modified,
+            })
+            .collect(),
+    ))
+}
 
 #[derive(Deserialize)]
 pub struct ListParams {

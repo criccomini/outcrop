@@ -119,6 +119,14 @@ pub struct ManifestDto {
     pub external_dbs: Vec<ExternalDbDto>,
 }
 
+/// Lightweight manifest listing entry: built from the object-store LIST
+/// alone, without fetching any manifest contents.
+#[derive(Serialize, Clone, Debug)]
+pub struct ManifestIdDto {
+    pub id: u64,
+    pub last_modified: DateTime<Utc>,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct ManifestSummaryDto {
     pub id: u64,

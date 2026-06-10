@@ -1,16 +1,41 @@
-import { useState } from 'react'
-import { useLsm } from '../api/client'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useLsm, useManifestIds } from '../api/client'
 import { KeyRangeView, SizeView } from '../components/LsmTreeViz'
 import { Panel } from '../components/Panel'
 import { QueryGate } from '../components/QueryGate'
 import { SstDetailDrawer } from '../components/SstDetailDrawer'
 import { keyText } from '../components/KeyDisplay'
+import { formatTime } from '../lib/format'
 import type { TreeDto } from '../api/types'
 
 export default function Lsm() {
-  const query = useLsm()
+  const [params, setParams] = useSearchParams()
+  const rawId = params.get('manifest_id')
+  const manifestId = rawId !== null ? Number(rawId) : undefined
+  const query = useLsm(manifestId)
+  const ids = useManifestIds()
   const [selected, setSelected] = useState<string | null>(null)
   const [segmentIdx, setSegmentIdx] = useState<number>(-1)
+
+  // A different manifest may have different segments, and its SSTs may since
+  // have been GC'd — reset the drill-down state when the view target moves.
+  useEffect(() => {
+    setSelected(null)
+    setSegmentIdx(-1)
+  }, [manifestId])
+
+  function viewManifest(id: number | undefined) {
+    setParams(id === undefined ? {} : { manifest_id: String(id) }, {
+      replace: true,
+    })
+  }
+
+  const idList = ids.data ?? []
+  const scrubIdx =
+    manifestId === undefined
+      ? idList.length - 1
+      : idList.findIndex((e) => e.id === manifestId)
 
   return (
     <div>
@@ -19,16 +44,41 @@ export default function Lsm() {
         {(lsm) => {
           const hasSegments = lsm.segments.length > 0
           const tree: TreeDto =
-            hasSegments && segmentIdx >= 0
+            hasSegments && segmentIdx >= 0 && segmentIdx < lsm.segments.length
               ? lsm.segments[segmentIdx].tree
               : lsm.tree
+          const historical = manifestId !== undefined
           return (
             <div className="mt-6 space-y-6">
-              <div className="text-sm text-ink-4">
-                As of manifest{' '}
-                <span className="font-mono">#{lsm.manifest_id}</span>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-4">
+                <span>
+                  As of manifest{' '}
+                  <span className="font-mono">#{lsm.manifest_id}</span>
+                </span>
+                {idList.length > 1 && (
+                  <span className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={idList.length - 1}
+                      value={scrubIdx >= 0 ? scrubIdx : idList.length - 1}
+                      onChange={(e) => {
+                        const idx = Number(e.target.value)
+                        const entry = idList[idx]
+                        if (!entry) return
+                        viewManifest(
+                          idx === idList.length - 1 ? undefined : entry.id,
+                        )
+                      }}
+                      className="w-56 accent-[#b26844]"
+                    />
+                    <span className="text-xs text-ink-5">
+                      #{idList[0]?.id} … #{idList[idList.length - 1]?.id}
+                    </span>
+                  </span>
+                )}
                 {lsm.segment_extractor_name && (
-                  <span className="ml-3">
+                  <span>
                     segment extractor:{' '}
                     <span className="font-mono">
                       {lsm.segment_extractor_name}
@@ -36,6 +86,25 @@ export default function Lsm() {
                   </span>
                 )}
               </div>
+
+              {historical && (
+                <div className="flex items-center gap-3 rounded-lg border border-accent/30 bg-accent-low px-4 py-2 text-sm text-accent-high">
+                  <span>
+                    Viewing historical manifest{' '}
+                    <span className="font-mono">#{lsm.manifest_id}</span>
+                    {scrubIdx >= 0 && idList[scrubIdx] && (
+                      <> from {formatTime(idList[scrubIdx].last_modified)}</>
+                    )}{' '}
+                    — polling paused.
+                  </span>
+                  <button
+                    onClick={() => viewManifest(undefined)}
+                    className="rounded-md bg-accent px-2.5 py-0.5 text-xs font-medium text-white transition-colors hover:bg-accent-high"
+                  >
+                    Back to latest
+                  </button>
+                </div>
+              )}
 
               {hasSegments && (
                 <div className="flex flex-wrap gap-1">

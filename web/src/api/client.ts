@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type {
   ActivityDto,
   CheckpointStatusDto,
@@ -8,6 +8,7 @@ import type {
   LsmDto,
   ManifestDiffDto,
   ManifestDto,
+  ManifestIdDto,
   ManifestSummaryDto,
   OverviewDto,
   SstDetailDto,
@@ -57,10 +58,27 @@ export function useOverview() {
   })
 }
 
-export function useLsm() {
+/**
+ * LSM tree as of `manifestId`, or the live latest when undefined. Historical
+ * manifests are immutable, so polling is off for them; keepPreviousData
+ * stops the scrubber flashing a loading state on every step.
+ */
+export function useLsm(manifestId?: number) {
   return useQuery<LsmDto, ApiRequestError>({
-    queryKey: ['lsm'],
-    queryFn: () => fetchJson('/api/lsm'),
+    queryKey: ['lsm', manifestId ?? 'latest'],
+    queryFn: () =>
+      fetchJson(
+        manifestId === undefined ? '/api/lsm' : `/api/lsm?manifest_id=${manifestId}`,
+      ),
+    refetchInterval: manifestId === undefined ? LIVE_REFETCH_MS : false,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useManifestIds() {
+  return useQuery<ManifestIdDto[], ApiRequestError>({
+    queryKey: ['manifest-ids'],
+    queryFn: () => fetchJson('/api/manifests/ids'),
     refetchInterval: LIVE_REFETCH_MS,
   })
 }
