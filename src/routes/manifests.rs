@@ -24,7 +24,7 @@ pub async fn list(
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<ManifestSummaryDto>>, ApiError> {
     let entries = state.manifest_entries().await?;
-    let limit = params.limit.unwrap_or(50).min(500);
+    let limit = params.limit.unwrap_or(50).min(500).max(1);
     let mut selected: Vec<_> = entries
         .iter()
         .filter(|e| {
