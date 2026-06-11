@@ -11,6 +11,10 @@ metadata reads, and object listings.
 Built against SlateDB **0.13.x**; older or newer manifest formats may not
 decode.
 
+![Overview page: sizes, WAL window, epochs, checkpoints, and the storage & garbage breakdown](docs/overview.png)
+
+![LSM Tree page: levels by size and key-range coverage for a 75 GiB database](docs/lsm.png)
+
 ## Features
 
 - **Overview** — health summary: sizes, SST counts, manifest freshness, WAL

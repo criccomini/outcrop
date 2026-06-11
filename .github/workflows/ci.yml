@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Frontend typecheck + build
+        # tsc -b runs as part of the build; the release binary embeds web/dist.
+        run: |
+          npm ci --prefix web
+          npm run build --prefix web
+
+      - name: Backend tests
+        run: cargo test
+
+      - name: Release build (frontend embedded)
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slatedb-dashboard-linux-x86_64
+          path: target/release/slatedb-dashboard
