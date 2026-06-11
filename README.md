@@ -137,20 +137,6 @@ CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run
 
 Note: `LOCAL_PATH` must be absolute; the object store canonicalizes it.
 
-To exercise the dashboard at scale, `--target-size` switches seeding to
-bulk mode: unthrottled batched writes with the embedded compactor and GC
-running, until the DB holds that much live data. Bulk seeding is
-resumable (progress is measured from the store itself) and bounds its
-transient disk use: peak ≈ target + `--max-garbage` (default 32GiB):
-
-```sh
-# One 50GiB DB with ~1600 32MiB SSTs, then churn it:
-cargo run -- traffic --target-size 50GiB
-```
-
-See `outcrop traffic --help` for the bulk-seeding knobs (`--value-bytes`,
-`--sst-bytes`, `--seed-only`, `--no-wal`, `--time-warp`).
-
 ## Development
 
 ```sh
