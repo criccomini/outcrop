@@ -61,7 +61,7 @@ export function SizeView({
                         const ulid = sstUlid(sst)
                         if (ulid) onSelect(ulid)
                       }}
-                      className={`min-w-0.5 rounded-[2px] transition-opacity hover:opacity-75 ${
+                      className={`relative min-w-0.5 rounded-[2px] transition-[opacity,filter] hover:z-10 hover:brightness-110 hover:ring-2 hover:ring-accent ${
                         selected === sstUlid(sst) ? 'ring-2 ring-accent-high' : ''
                       }`}
                       style={{
@@ -159,7 +159,7 @@ export function KeyRangeView({
                           const ulid = sstUlid(sst)
                           if (ulid) onSelect(ulid)
                         }}
-                        className={`absolute top-0.5 bottom-0.5 rounded-[2px] transition-opacity hover:opacity-100 ${
+                        className={`absolute top-0.5 bottom-0.5 rounded-[2px] transition-[opacity,filter] hover:z-10 hover:opacity-100 hover:brightness-110 hover:ring-2 hover:ring-accent ${
                           selected === sstUlid(sst) ? 'ring-2 ring-accent-high' : ''
                         }`}
                         style={{
@@ -330,7 +330,7 @@ function CoverageStrip({
                 ? `${range}\n${depth} SST${depth === 1 ? '' : 's'} deep\nClick to list SSTs`
                 : undefined
             }
-            className={`h-full flex-1 transition-opacity enabled:hover:opacity-60 ${
+            className={`relative h-full flex-1 transition-[opacity,filter] enabled:hover:z-10 enabled:hover:brightness-110 enabled:hover:ring-2 enabled:hover:ring-accent ${
               activeBucket === i ? 'ring-2 ring-inset ring-accent-high' : ''
             }`}
             style={{
