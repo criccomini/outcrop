@@ -42,6 +42,19 @@ decode.
 - **One binary**: embedded SPA, `--api-only`/`--ui-only` splits, demo
   data generator included.
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/criccomini/outcrop/main/install.sh | sh
+```
+
+Downloads the latest release for your platform (Linux x86_64/arm64, macOS
+arm64), verifies its checksum, and installs to `~/.local/bin` (override
+with `OUTCROP_INSTALL`; pin a version with `OUTCROP_VERSION`). Windows
+and Intel-Mac users: grab a binary from the
+[releases page](https://github.com/criccomini/outcrop/releases) or build
+from source (see Development).
+
 ## Running
 
 Everything is one binary, and DBs are **auto-discovered**: the dashboard
@@ -68,7 +81,8 @@ outcrop serve --ui-only --api-url http://api-host:8333
 ```
 
 `stores.toml` carries each store's provider settings inline, keyed by the
-documented env-var names lowercased. Values may reference ambient env vars
+[documented env-var names](https://docs.rs/slatedb/latest/slatedb/admin/)
+lowercased. Values may reference ambient env vars
 with `${VAR}`: that's how multiple stores of the same provider use
 different credentials without putting secrets in the file (unset keys also
 fall through to the ambient env):
