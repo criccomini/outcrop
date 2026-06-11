@@ -17,10 +17,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - os: macos-13
-            target: x86_64-apple-darwin
           - os: macos-latest
             target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -44,16 +44,24 @@ jobs:
           cargo build --release
 
       - name: Package
+        shell: bash
         run: |
           STAGE="outcrop-${GITHUB_REF_NAME}-${{ matrix.target }}"
           mkdir "$STAGE"
-          cp target/release/outcrop LICENSE README.md "$STAGE"/
-          tar czf "$STAGE.tar.gz" "$STAGE"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/outcrop.exe LICENSE README.md "$STAGE"/
+            7z a "$STAGE.zip" "$STAGE"
+          else
+            cp target/release/outcrop LICENSE README.md "$STAGE"/
+            tar czf "$STAGE.tar.gz" "$STAGE"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.target }}
-          path: "*.tar.gz"
+          path: |
+            *.tar.gz
+            *.zip
 
   release:
     needs: build
@@ -67,11 +75,12 @@ jobs:
           merge-multiple: true
 
       - name: Checksums
-        run: sha256sum *.tar.gz > SHA256SUMS
+        run: sha256sum *.tar.gz *.zip > SHA256SUMS
 
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             *.tar.gz
+            *.zip
             SHA256SUMS
           generate_release_notes: true
