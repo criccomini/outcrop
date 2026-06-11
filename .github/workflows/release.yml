@@ -8,7 +8,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Fail fast (before burning four build runners) if the tag and the crate
+  # version disagree — the binary's --version comes from Cargo.toml.
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches Cargo.toml version
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          if [ "v$CARGO_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $CARGO_VERSION (expected tag v$CARGO_VERSION)"
+            exit 1
+          fi
+
   build:
+    needs: check-version
     strategy:
       fail-fast: false
       matrix:
