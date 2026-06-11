@@ -106,6 +106,14 @@ pub struct TrafficArgs {
     /// traffic phase keeps its WAL so the dashboard's WAL page has data)
     #[arg(long)]
     no_wal: bool,
+
+    /// Bulk seeding: pause writing whenever non-live bytes in the store
+    /// exceed this budget, and GC until they drain (the compactor's
+    /// internal 15-minute checkpoints pin replaced SSTs, so full-speed
+    /// seeding otherwise accumulates transient garbage far past the
+    /// target). Peak disk per DB ≈ target-size + this. Bigger = faster
+    #[arg(long, value_parser = parse_size, default_value = "32GiB")]
+    max_garbage: u64,
 }
 
 /// Size like "1024", "128KiB" or "50gb" in bytes. Units are binary
@@ -539,6 +547,20 @@ async fn live_bytes(admin: &Admin) -> anyhow::Result<u64> {
     Ok(total)
 }
 
+/// Total bytes stored under the DB's prefix — live data plus WAL plus
+/// not-yet-collected garbage. One LIST; cheap on the local stores bulk
+/// seeding targets.
+async fn stored_bytes(store: &dyn ObjectStore, db_path: &str) -> anyhow::Result<u64> {
+    use futures::TryStreamExt;
+    let prefix = slatedb::object_store::path::Path::from(db_path);
+    let mut stream = store.list(Some(&prefix));
+    let mut total = 0u64;
+    while let Some(meta) = stream.try_next().await? {
+        total += meta.size;
+    }
+    Ok(total)
+}
+
 fn fmt_bytes(b: u64) -> String {
     if b < 1024 {
         return format!("{b}B");
@@ -590,6 +612,7 @@ async fn bulk_seed(
         );
         // Still worth a pass: seed garbage pinned by the compactor's
         // 15-minute internal checkpoints becomes collectible on re-runs.
+        println!("[{db_path}] collecting leftover seed garbage (one GC pass) ...");
         collect_seed_garbage(db_path, store).await?;
         return Ok(());
     }
@@ -647,13 +670,56 @@ async fn bulk_seed(
         })
         .await?;
         live = live_bytes(&admin).await?;
+        let garbage = stored_bytes(store.as_ref(), db_path)
+            .await?
+            .saturating_sub(live);
         let mb_s = written as f64 / 1e6 / started.elapsed().as_secs_f64().max(0.001);
         println!(
-            "[{db_path}] bulk: {} / {} live · {} written · {mb_s:.0} MB/s",
+            "[{db_path}] bulk: {} / {} live · {} written · {} garbage · {mb_s:.0} MB/s",
             fmt_bytes(live),
             fmt_bytes(target),
             fmt_bytes(written),
+            fmt_bytes(garbage),
         );
+
+        // Chunked seeding: replaced SSTs stay pinned by the compactor's
+        // internal 15-minute checkpoints, so an unthrottled seed
+        // accumulates transient garbage at the compaction-rewrite rate —
+        // several times the target. Once the budget is exceeded, stop
+        // writing and GC until enough pins expire; resume at half the
+        // budget so pauses don't thrash.
+        if garbage > args.max_garbage {
+            println!(
+                "[{db_path}] pausing writes: {} garbage > {} budget — collecting as the \
+                 compactor's checkpoints expire (≤15m), resuming below {}",
+                fmt_bytes(garbage),
+                fmt_bytes(args.max_garbage),
+                fmt_bytes(args.max_garbage / 2),
+            );
+            loop {
+                if token.is_cancelled() {
+                    interrupted = true;
+                    break 'seeding;
+                }
+                collect_seed_garbage(db_path, store.clone()).await?;
+                let garbage = stored_bytes(store.as_ref(), db_path)
+                    .await?
+                    .saturating_sub(live_bytes(&admin).await?);
+                if garbage <= args.max_garbage / 2 {
+                    println!(
+                        "[{db_path}] resuming writes ({} garbage)",
+                        fmt_bytes(garbage)
+                    );
+                    break;
+                }
+                println!(
+                    "[{db_path}] draining: {} garbage (resume ≤ {})",
+                    fmt_bytes(garbage),
+                    fmt_bytes(args.max_garbage / 2),
+                );
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        }
     }
     println!("[{db_path}] closing (final flush, compactor wind-down) ...");
     db.close().await?;
@@ -674,6 +740,7 @@ async fn bulk_seed(
         )
         .await?;
     }
+    println!("[{db_path}] collecting seed garbage (one GC pass) ...");
     collect_seed_garbage(db_path, store).await?;
     println!(
         "[{db_path}] bulk seed complete: {} live (replaced SSTs stay pinned by the \
@@ -695,7 +762,6 @@ async fn collect_seed_garbage(
     db_path: &str,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<()> {
-    println!("[{db_path}] collecting seed garbage (one GC pass) ...");
     let dir_opts = |min_age| {
         Some(GarbageCollectorDirectoryOptions {
             interval: None,
@@ -1008,6 +1074,7 @@ mod tests {
             sst_bytes: None,
             seed_only: false,
             no_wal: false,
+            max_garbage: 32 << 30,
         }
     }
 

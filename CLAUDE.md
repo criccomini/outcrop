@@ -25,7 +25,11 @@ cargo run -- traffic                # --dbs N fleet size; --clean wipes ./demo-d
 # persisted). SST count ≈ target-size / sst-bytes.
 cargo run -- traffic --target-size 50GiB --seed-only   # defaults: --dbs 1,
                                     # --value-bytes 4KiB..64KiB, --sst-bytes 32MiB;
-                                    # --no-wal halves seed bytes written
+                                    # --no-wal halves seed bytes written.
+# Seeding is chunked: writes pause + GC when non-live bytes exceed
+# --max-garbage (default 32GiB; the compactor's internal 15-minute
+# checkpoints pin replaced SSTs, so pauses can last up to ~15m). Peak disk
+# per DB ≈ target-size + max-garbage + in-flight compaction slack.
 
 # Run the server (UI + API on 127.0.0.1:8333; LOCAL_PATH must be absolute).
 # DBs are auto-discovered; there is no --path.
