@@ -1,12 +1,15 @@
 # slatedb-dashboard
 
-A **read-only** web dashboard for inspecting a [SlateDB](https://slatedb.io)
-database directly from object storage.
+A **read-only** web dashboard for inspecting [SlateDB](https://slatedb.io)
+databases directly from object storage.
 
 SlateDB keeps all of its state — manifests, WAL SSTs, L0 SSTs, sorted runs,
 checkpoints — in the object store, so the dashboard needs no cooperation from
 the running writer. It performs **zero writes**: only manifest reads, SST
 metadata reads, and object listings.
+
+Built against SlateDB **0.13.x**; older or newer manifest formats may not
+decode.
 
 ## Features
 
@@ -14,19 +17,31 @@ metadata reads, and object listings.
   window, epochs, plus a storage & garbage panel (space amplification, bytes
   pinned by checkpoints, and what the GC would reclaim).
 - **Alerts** — health warnings (L0 backlog, WAL window growth, stale
-  manifests, expired checkpoints) in one place, with a count badge in the
-  nav.
-- **LSM Tree** — visual tree: levels by size and key-range coverage; levels too large to draw per-SST render as coverage histograms, so the page stays fast on huge DBs
-  (overlap reads as read amplification), with per-SST drill-down into block
-  index, bloom filter/stats sizes, and content stats.
+  manifests, expired checkpoints the GC never swept) in one place, with a
+  count badge in the nav.
+- **Activity** — a unified feed, newest first: manifest transitions (runs of
+  flushes coalesced, each linking to its diff), the compactor's job log —
+  which reaches further back than transitions, since the GC prunes old
+  manifests within minutes — and GC deletions observed by the server,
+  grouped per sweep and expandable to the individual objects.
+- **LSM Tree** — the tree two ways: levels by size, and key-range coverage
+  where vertical overlap reads as read amplification. Levels too large to
+  draw per-SST render as coverage histograms instead, so the page stays fast
+  on huge DBs — clicking a histogram bucket lists the SSTs covering that key
+  range. Every SST clicks through to block index, bloom filter and content
+  stats. Segmented DBs (RFC-0024) get one tab per segment, and a manifest
+  scrubber rewinds the whole view to any retained version.
+- **WAL** — the write-ahead log listing with the replay window highlighted.
 - **Manifests** — full history, structured view of any version, and a
   semantic diff between any two versions ("3 L0 SSTs compacted into SR 7").
-- **Compactions** — current compactor state plus history of `.compactions`
-  versions.
+- **Compactions** — what's compacting right now, plus the history of
+  `.compactions` versions and per-job drill-down.
 - **Checkpoints** — checkpoint table with expiry countdowns, and clone
   lineage (parent path, shared SSTs, detached or not).
 - **Garbage** — GC health: live / pinned / reclaimable breakdown, which
   checkpoints keep how much storage alive, and recent GC sweeps.
+- **Search** — one box that finds manifests, checkpoints, SSTs and
+  compactions by id, ULID, UUID or key.
 
 ## Running
 
@@ -83,6 +98,31 @@ cost stays bounded), `--scan-depth` (default 4) / `--scan-ttl-secs`
 (default 60) for discovery, `--api-only` / `--ui-only --api-url URL`,
 `--cors-allow-origin` (repeatable).
 
+The dashboard has **no authentication** and, while read-only, exposes DB
+metadata (key ranges, checkpoint names, store paths). It binds to
+localhost by default; to share it, put it behind a reverse proxy that
+handles auth, or at least bind only to a trusted network.
+
+## REST API
+
+Everything the UI shows comes from a JSON API you can use directly:
+
+- `GET /api/dbs` — discovered databases; per-DB resources live under
+  `/api/dbs/{db}/…` where `{db}` is the id `{store}:{path}` as a single
+  path segment (percent-encode any slashes in the path).
+- `GET /api/openapi.json` — OpenAPI 3.1 document covering every endpoint
+  and schema. Generate typed clients with any OpenAPI generator, e.g.
+  `npx openapi-typescript http://127.0.0.1:8333/api/openapi.json`.
+- `GET /api/docs` — interactive API reference rendering that spec (the
+  viewer script loads from a CDN; the spec itself is self-contained).
+- `GET /metrics` — Prometheus exposition for every discovered DB (sizes,
+  SST counts, WAL window, epochs, manifest freshness), root-level by
+  convention.
+
+Errors are JSON `{"error": "..."}` with conventional status codes. List
+endpoints cap their `limit` parameters server-side because every item can
+cost an object-store request.
+
 ## Demo
 
 ```sh
@@ -100,13 +140,35 @@ CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run
 
 Note: `LOCAL_PATH` must be absolute — the object store canonicalizes it.
 
+To exercise the dashboard at scale, `--target-size` switches seeding to
+bulk mode: unthrottled batched writes with the embedded compactor and GC
+running, until the DB holds that much live data. Bulk seeding is
+resumable (progress is measured from the store itself) and bounds its
+transient disk use — peak ≈ target + `--max-garbage` (default 32GiB):
+
+```sh
+# One 50GiB DB with ~1600 32MiB SSTs, then churn it:
+cargo run -- traffic --target-size 50GiB
+# Knobs: --value-bytes 4KiB..64KiB, --sst-bytes 32MiB (SST count ≈
+# target/sst-bytes), --seed-only (exit after seeding), --no-wal (halve
+# seed bytes written), --time-warp (expire the compactor's internal
+# 15-minute checkpoints in seconds instead of waiting them out, so
+# seeding runs at raw write speed; only safe while nothing reads the DB).
+```
+
 ## Development
 
 ```sh
 npm run dev --prefix web    # Vite dev server on :5173, proxies /api to :8333
-cargo test                  # unit tests
+npx tsc --noEmit            # typecheck the frontend (run inside web/)
+cargo test                  # backend unit tests
 ./scripts/smoke.sh          # curl every endpoint against a running server
 
-# Release binary with the frontend embedded (single-file deploy):
+# Release binary with the frontend embedded (single-file deploy);
+# needs Rust (stable) and Node 18+:
 npm run build --prefix web && cargo build --release
 ```
+
+In debug builds the server reads `web/dist` from disk, so after
+`npm run build --prefix web` a running debug server picks up frontend
+changes without a cargo rebuild; release builds embed the assets.
