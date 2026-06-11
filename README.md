@@ -19,35 +19,24 @@ decode.
 
 ## Features
 
-- **Overview** — health summary: sizes, SST counts, manifest freshness, WAL
-  window, epochs, plus a storage & garbage panel (space amplification, bytes
-  pinned by checkpoints, and what the GC would reclaim).
-- **Alerts** — health warnings (L0 backlog, WAL window growth, stale
-  manifests, expired checkpoints the GC never swept) in one place, with a
-  count badge in the nav.
-- **Activity** — a unified feed, newest first: manifest transitions (runs of
-  flushes coalesced, each linking to its diff), the compactor's job log —
-  which reaches further back than transitions, since the GC prunes old
-  manifests within minutes — and GC deletions observed by the server,
-  grouped per sweep and expandable to the individual objects.
-- **LSM Tree** — the tree two ways: levels by size, and key-range coverage
-  where vertical overlap reads as read amplification. Levels too large to
-  draw per-SST render as coverage histograms instead, so the page stays fast
-  on huge DBs — clicking a histogram bucket lists the SSTs covering that key
-  range. Every SST clicks through to block index, bloom filter and content
-  stats. Segmented DBs (RFC-0024) get one tab per segment, and a manifest
-  scrubber rewinds the whole view to any retained version.
-- **WAL** — the write-ahead log listing with the replay window highlighted.
-- **Manifests** — full history, structured view of any version, and a
-  semantic diff between any two versions ("3 L0 SSTs compacted into SR 7").
-- **Compactions** — what's compacting right now, plus the history of
-  `.compactions` versions and per-job drill-down.
-- **Checkpoints** — checkpoint table with expiry countdowns, and clone
-  lineage (parent path, shared SSTs, detached or not).
-- **Garbage** — GC health: live / pinned / reclaimable breakdown, which
-  checkpoints keep how much storage alive, and recent GC sweeps.
-- **Search** — one box that finds manifests, checkpoints, SSTs and
-  compactions by id, ULID, UUID or key.
+- **Overview** — sizes, SST counts, WAL window, epochs, and a storage &
+  garbage summary at a glance.
+- **Alerts** — health warnings (L0 backlog, WAL growth, stale manifests,
+  unswept checkpoints) with a count badge in the nav.
+- **Activity** — one feed of flushes, compactions and GC sweeps; rows link
+  to their diff or expand to the individual objects.
+- **LSM Tree** — levels by size and key-range coverage (overlap reads as
+  read amplification), with per-SST drill-down that scales to huge trees;
+  segment tabs and a manifest-history scrubber.
+- **WAL** — the log listing with the replay window highlighted.
+- **Manifests** — full history, any version in detail, and semantic diffs
+  ("3 L0 SSTs compacted into SR 7").
+- **Compactions** — live compactor state, job history, per-job drill-down.
+- **Checkpoints** — expiry countdowns and clone lineage.
+- **Garbage** — live / pinned / reclaimable breakdown and which checkpoints
+  pin how much.
+- **Search** — manifests, checkpoints, SSTs and compactions by id, ULID,
+  UUID or key.
 
 ## Running
 
