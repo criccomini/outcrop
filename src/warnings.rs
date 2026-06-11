@@ -11,6 +11,13 @@ const L0_WARN_COUNT: usize = 8;
 const STALE_MANIFEST_AFTER_MINS: i64 = 10;
 /// Un-replayed WAL SSTs before warning about replay backlog.
 const WAL_WINDOW_WARN: u64 = 100;
+/// How long past expiry a checkpoint may linger before it's suspicious.
+/// Expired-but-unswept checkpoints are normal slatedb operation: every
+/// compaction commit writes an internal 15-minute checkpoint, and the GC
+/// sweeps expired ones on its own cadence — one that stretches to minutes
+/// under churn, since each pass reads every checkpointed manifest. Only a
+/// checkpoint stale past any healthy sweep cadence indicates a GC problem.
+const EXPIRED_CHECKPOINT_GRACE_MINS: i64 = 20;
 
 pub struct WarningInputs<'a> {
     pub manifest: &'a ManifestDto,
@@ -25,18 +32,22 @@ pub fn compute_warnings(i: &WarningInputs) -> Vec<WarningDto> {
     let mut out = Vec::new();
     let m = i.manifest;
 
-    let expired = m
+    let stale_expiries: Vec<DateTime<Utc>> = m
         .checkpoints
         .iter()
-        .filter(|c| c.expire_time.is_some_and(|t| t < i.now))
-        .count();
-    if expired > 0 {
+        .filter_map(|c| c.expire_time)
+        .filter(|t| i.now - *t > Duration::minutes(EXPIRED_CHECKPOINT_GRACE_MINS))
+        .collect();
+    if let Some(oldest) = stale_expiries.iter().min() {
+        let stale = stale_expiries.len();
         out.push(WarningDto {
             code: "expired_checkpoint",
             severity: "warn",
             message: format!(
-                "{expired} expired checkpoint{} still in the manifest — is the garbage collector running?",
-                if expired > 1 { "s" } else { "" }
+                "{stale} checkpoint{} expired over {EXPIRED_CHECKPOINT_GRACE_MINS} minutes ago \
+                 and never swept (oldest {}m) — is the garbage collector running?",
+                if stale > 1 { "s" } else { "" },
+                (i.now - *oldest).num_minutes()
             ),
         });
     }
@@ -194,14 +205,37 @@ mod tests {
     }
 
     #[test]
-    fn expired_checkpoint_warns() {
+    fn recently_expired_checkpoints_are_normal_gc_lag() {
+        // The compactor mints 15-minute internal checkpoints constantly;
+        // expired ones awaiting the next GC sweep must not warn.
         let mut m = manifest();
         m.checkpoints = vec![
-            checkpoint(10, Some(now() - Duration::minutes(1))),
+            checkpoint(10, Some(now() - Duration::minutes(19))),
             checkpoint(10, Some(now() + Duration::minutes(1))),
             checkpoint(10, None),
         ];
-        assert_eq!(codes(&m, &[10], Some(now())), vec!["expired_checkpoint"]);
+        assert!(codes(&m, &[10], Some(now())).is_empty());
+    }
+
+    #[test]
+    fn long_stale_expired_checkpoint_warns() {
+        let mut m = manifest();
+        m.checkpoints = vec![
+            checkpoint(10, Some(now() - Duration::minutes(45))),
+            checkpoint(10, Some(now() - Duration::minutes(21))),
+            checkpoint(10, Some(now() - Duration::minutes(1))),
+        ];
+        let live: HashSet<u64> = [10].into_iter().collect();
+        let warnings = compute_warnings(&WarningInputs {
+            manifest: &m,
+            live_manifest_ids: &live,
+            latest_manifest_written_at: Some(now()),
+            now: now(),
+        });
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].code, "expired_checkpoint");
+        assert!(warnings[0].message.contains("2 checkpoints"));
+        assert!(warnings[0].message.contains("oldest 45m"));
     }
 
     #[test]
