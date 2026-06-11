@@ -26,8 +26,10 @@ use crate::state::AppState;
 #[into_params(parameter_in = Path)]
 #[allow(dead_code)]
 pub struct DbPathParam {
-    /// Database id `{store}:{path}`, URL-encoded as one path segment
-    /// (e.g. `default%3Ademo-db-1`).
+    /// Database id `{store}:{path}` as a single path segment, e.g.
+    /// `default:demo-db-1`. The colon may be sent raw; percent-encode any
+    /// slashes in the DB path (`default:teams%2Fa%2Fdb1`) or the route
+    /// won't match.
     pub db: String,
 }
 
