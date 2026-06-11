@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   useActivity,
@@ -58,6 +58,9 @@ interface Row {
   link: { to: string; label: string }
   /** Compactor-job status badge (failed jobs only). */
   badge?: string
+  /** GC rows: the individual deletions behind the aggregate, expandable
+   *  inline (deleted objects have no page of their own to link to). */
+  gcEvents?: GcEventDto[]
 }
 
 const sum = (ns: number[]) => ns.reduce((a, b) => a + b, 0)
@@ -166,31 +169,67 @@ const GC_KIND_LABEL = {
 function gcDeletionRows(events: GcEventDto[]): Row[] {
   const groups = new Map<
     string,
-    { kind: GcEventDto['kind']; at: number; count: number; bytes: number; anomalies: number }
+    {
+      kind: GcEventDto['kind']
+      at: number
+      bytes: number
+      anomalies: number
+      events: GcEventDto[]
+    }
   >()
   for (const e of events) {
     const key = `${e.missing_at}|${e.kind}`
     const g = groups.get(key) ?? {
       kind: e.kind,
       at: Date.parse(e.missing_at),
-      count: 0,
       bytes: 0,
       anomalies: 0,
+      events: [],
     }
-    g.count += 1
     g.bytes += e.size_bytes
     if (e.referenced === true) g.anomalies += 1
+    g.events.push(e)
     groups.set(key, g)
   }
   return [...groups.values()].map((g) => ({
     key: `gcdel-${g.kind}-${g.at}`,
     at: g.at,
     kind: 'gc' as FeedKind,
-    text: `deleted ${g.count} ${GC_KIND_LABEL[g.kind]}${plural(g.count)} · ${formatBytes(g.bytes)}${
+    text: `deleted ${g.events.length} ${GC_KIND_LABEL[g.kind]}${plural(g.events.length)} · ${formatBytes(g.bytes)}${
       g.anomalies > 0 ? ` · ${g.anomalies} still referenced!` : ''
     }`,
     link: { to: '/garbage', label: 'garbage' },
+    // Anomalies first, then biggest objects, so the interesting lines
+    // surface at the top of the expansion.
+    gcEvents: [...g.events].sort(
+      (a, b) =>
+        Number(b.referenced === true) - Number(a.referenced === true) ||
+        b.size_bytes - a.size_bytes,
+    ),
   }))
+}
+
+/** One deleted object inside an expanded GC row. */
+function GcEventLine({ e }: { e: GcEventDto }) {
+  return (
+    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1">
+      <span className="min-w-28 font-mono text-xs text-ink-3">{e.id}</span>
+      <span className="w-16 text-right text-xs text-ink-4">
+        {formatBytes(e.size_bytes)}
+      </span>
+      <span className="text-xs text-ink-5" title={formatTime(e.written_at)}>
+        written {formatRelative(e.written_at)}
+      </span>
+      <span className="text-xs text-ink-5" title={formatTime(e.last_seen_at)}>
+        last seen {formatRelative(e.last_seen_at)}
+      </span>
+      {e.referenced === true && (
+        <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
+          still referenced!
+        </span>
+      )}
+    </li>
+  )
 }
 
 /** "3h" style duration for quiet-gap dividers. */
@@ -334,6 +373,16 @@ export default function Activity() {
     else p.set('kinds', [...next].join(','))
     setParams(p, { replace: true })
   }
+  // GC rows expanded to their per-object deletions; row keys are stable
+  // across polls, so an open row stays open while the feed refreshes.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleExpanded = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   return (
     <div>
       <h1 className="text-3xl">Activity</h1>
@@ -400,14 +449,27 @@ export default function Activity() {
                               {formatRelative(new Date(row.at).toISOString())}
                             </span>
                             <KindChip kind={row.kind} />
-                            <span className="min-w-0 flex-1 basis-52 text-sm text-ink-2">
-                              {row.text}
-                              {row.badge && (
-                                <span className="ml-2">
-                                  <StatusBadge status={row.badge} />
+                            {row.gcEvents ? (
+                              <button
+                                onClick={() => toggleExpanded(row.key)}
+                                aria-expanded={expanded.has(row.key)}
+                                className="min-w-0 flex-1 basis-52 text-left text-sm text-ink-2 hover:text-ink-1"
+                              >
+                                {row.text}
+                                <span className="ml-2 text-xs text-ink-5">
+                                  {expanded.has(row.key) ? '▾' : '▸'}
                                 </span>
-                              )}
-                            </span>
+                              </button>
+                            ) : (
+                              <span className="min-w-0 flex-1 basis-52 text-sm text-ink-2">
+                                {row.text}
+                                {row.badge && (
+                                  <span className="ml-2">
+                                    <StatusBadge status={row.badge} />
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             <Link
                               to={dbPath(row.link.to)}
                               className="ml-auto shrink-0 font-mono text-xs text-accent hover:text-accent-high"
@@ -415,6 +477,15 @@ export default function Activity() {
                               {row.link.label}
                             </Link>
                           </li>
+                          {row.gcEvents && expanded.has(row.key) && (
+                            <li className="border-t border-ink-7/30 bg-surface-2/50 py-1.5 pl-16 pr-4 sm:pl-24">
+                              <ol className="max-h-64 divide-y divide-ink-7/30 overflow-y-auto">
+                                {row.gcEvents.map((e) => (
+                                  <GcEventLine key={`${e.kind}-${e.id}`} e={e} />
+                                ))}
+                              </ol>
+                            </li>
+                          )}
                         </Fragment>
                       )
                     })}
