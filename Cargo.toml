@@ -18,6 +18,9 @@ slatedb = { version = "0.13.1", features = [
     # Exposes Settings::wal_enabled (default true) for `traffic --no-wal`.
     "wal_disable",
 ] }
+# slatedb's own common crate — version must move in lockstep with slatedb.
+# test-util exposes MockSystemClock for `traffic --time-warp`.
+slatedb-common = { version = "0.13.1", features = ["test-util"] }
 anyhow = "1"
 axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }

@@ -27,6 +27,7 @@ use slatedb::object_store::local::LocalFileSystem;
 use slatedb::object_store::ObjectStore;
 use slatedb::prefix_extractor::{PrefixExtractor, PrefixTarget};
 use slatedb::{Db, WriteBatch};
+use slatedb_common::clock::MockSystemClock;
 use tokio_util::sync::CancellationToken;
 
 #[derive(clap::Args, Debug)]
@@ -114,6 +115,16 @@ pub struct TrafficArgs {
     /// target). Peak disk per DB ≈ target-size + this. Bigger = faster
     #[arg(long, value_parser = parse_size, default_value = "32GiB")]
     max_garbage: u64,
+
+    /// Bulk seeding: during garbage drains, run GC passes on a clock set
+    /// just past the compactor's internal 15-minute checkpoint expiries,
+    /// collecting them in seconds instead of waiting them out — seeding
+    /// runs at raw write speed. Safe here because nothing reads the DB
+    /// while it seeds (in-flight compactions stay protected by the GC's
+    /// compaction-watermark and newest-L0 barriers); don't warp a DB that
+    /// has live readers
+    #[arg(long)]
+    time_warp: bool,
 }
 
 /// Size like "1024", "128KiB" or "50gb" in bytes. Units are binary
@@ -336,6 +347,7 @@ async fn open_bulk_db(
     path: &str,
     shape: &Shape,
     no_wal: bool,
+    warp: bool,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<Db> {
     let settings = Settings {
@@ -345,6 +357,12 @@ async fn open_bulk_db(
         wal_enabled: !no_wal,
         l0_max_ssts: 64,
         l0_max_ssts_per_key: 64,
+        // Under --time-warp the drain loop runs explicit forced-expiry GC
+        // passes; disable the embedded GC so two collectors never race.
+        garbage_collector_options: match warp {
+            true => None,
+            false => Settings::default().garbage_collector_options,
+        },
         compactor_options: Some(CompactorOptions {
             poll_interval: Duration::from_millis(500),
             max_sst_size: shape.sst_bytes as usize,
@@ -547,6 +565,15 @@ async fn live_bytes(admin: &Admin) -> anyhow::Result<u64> {
     Ok(total)
 }
 
+/// Whether any compaction is currently in flight, per the compactions
+/// file. One small GET.
+async fn compactor_busy(admin: &Admin) -> bool {
+    match admin.read_compactions(None).await {
+        Ok(Some(vc)) => vc.recent_compactions().any(|c| c.active()),
+        _ => false,
+    }
+}
+
 /// Total bytes stored under the DB's prefix — live data plus WAL plus
 /// not-yet-collected garbage. One LIST; cheap on the local stores bulk
 /// seeding targets.
@@ -613,7 +640,7 @@ async fn bulk_seed(
         // Still worth a pass: seed garbage pinned by the compactor's
         // 15-minute internal checkpoints becomes collectible on re-runs.
         println!("[{db_path}] collecting leftover seed garbage (one GC pass) ...");
-        collect_seed_garbage(db_path, store).await?;
+        collect_seed_garbage(db_path, store, args.time_warp).await?;
         return Ok(());
     }
     println!(
@@ -627,7 +654,7 @@ async fn bulk_seed(
         if args.no_wal { "off" } else { "on" },
     );
 
-    let db = open_bulk_db(db_path, shape, args.no_wal, store.clone()).await?;
+    let db = open_bulk_db(db_path, shape, args.no_wal, args.time_warp, store.clone()).await?;
     let write_opts = WriteOptions {
         await_durable: false,
         ..Default::default()
@@ -696,12 +723,15 @@ async fn bulk_seed(
                 fmt_bytes(args.max_garbage),
                 fmt_bytes(args.max_garbage / 2),
             );
+            let mut prev_garbage = u64::MAX;
             loop {
                 if token.is_cancelled() {
                     interrupted = true;
                     break 'seeding;
                 }
-                collect_seed_garbage(db_path, store.clone()).await?;
+                // Warp passes force-expire the internal pins, so the only
+                // wait left is delete I/O and checkpoint/min-age expiry.
+                collect_seed_garbage(db_path, store.clone(), args.time_warp).await?;
                 let garbage = stored_bytes(store.as_ref(), db_path)
                     .await?
                     .saturating_sub(live_bytes(&admin).await?);
@@ -712,12 +742,34 @@ async fn bulk_seed(
                     );
                     break;
                 }
+                // A drain can't always reach the threshold: the GC never
+                // deletes SSTs newer than the last finished compaction
+                // (its watermark), and once the compactor goes idle with
+                // writes paused, no newer compaction can advance it —
+                // waiting longer changes nothing. Resume; the next pause
+                // collects this tail. While merges are still in flight,
+                // keep waiting: each one that finishes advances the
+                // watermark and unlocks more.
+                if garbage >= prev_garbage && !compactor_busy(&admin).await {
+                    println!(
+                        "[{db_path}] resuming writes ({} garbage; the rest unlocks once \
+                         new compactions advance the GC watermark)",
+                        fmt_bytes(garbage)
+                    );
+                    break;
+                }
+                prev_garbage = garbage;
                 println!(
                     "[{db_path}] draining: {} garbage (resume ≤ {})",
                     fmt_bytes(garbage),
                     fmt_bytes(args.max_garbage / 2),
                 );
-                tokio::time::sleep(Duration::from_secs(30)).await;
+                tokio::time::sleep(Duration::from_secs(if args.time_warp {
+                    2
+                } else {
+                    30
+                }))
+                .await;
             }
         }
     }
@@ -731,23 +783,30 @@ async fn bulk_seed(
         );
         return Ok(());
     }
+    // GC before the named checkpoint: compactions that finished during
+    // wind-down left fresh (under warp: future-stamped) internal pins.
+    println!("[{db_path}] collecting seed garbage (one GC pass) ...");
+    collect_seed_garbage(db_path, store.clone(), args.time_warp).await?;
     if written > 0 {
         create_checkpoint(
             db_path,
-            store.clone(),
+            store,
             "bulk-final",
             Some(Duration::from_secs(24 * 3600)),
         )
         .await?;
     }
-    println!("[{db_path}] collecting seed garbage (one GC pass) ...");
-    collect_seed_garbage(db_path, store).await?;
-    println!(
-        "[{db_path}] bulk seed complete: {} live (replaced SSTs stay pinned by the \
-         compactor's 15-minute internal checkpoints; they're GC'd during traffic \
-         mode, or by re-running after the checkpoints expire)",
-        fmt_bytes(live)
-    );
+    if args.time_warp {
+        // The warped GC passes already expired and collected the pins.
+        println!("[{db_path}] bulk seed complete: {} live", fmt_bytes(live));
+    } else {
+        println!(
+            "[{db_path}] bulk seed complete: {} live (replaced SSTs stay pinned by the \
+             compactor's 15-minute internal checkpoints; they're GC'd during traffic \
+             mode, or by re-running after the checkpoints expire)",
+            fmt_bytes(live)
+        );
+    }
     Ok(())
 }
 
@@ -758,9 +817,15 @@ async fn bulk_seed(
 /// protect anything in flight, and checkpoint pins are honored (the
 /// compactor's internal 15-minute checkpoints keep some garbage alive
 /// until they expire).
+///
+/// With `warp`, the pass runs on a mock clock set just past the latest
+/// *unnamed* checkpoint expiry (the compactor's internal pins — possibly
+/// stamped ahead of real time by a warped seed), so they all expire and
+/// collect now. Named checkpoints (bulk-final, demo-*) are untouched.
 async fn collect_seed_garbage(
     db_path: &str,
     store: Arc<dyn ObjectStore>,
+    warp: bool,
 ) -> anyhow::Result<()> {
     let dir_opts = |min_age| {
         Some(GarbageCollectorDirectoryOptions {
@@ -768,7 +833,25 @@ async fn collect_seed_garbage(
             min_age,
         })
     };
-    let admin = AdminBuilder::new(db_path.to_string(), store).build();
+    let mut builder = AdminBuilder::new(db_path.to_string(), store.clone());
+    if warp {
+        let probe = AdminBuilder::new(db_path.to_string(), store).build();
+        if let Some(m) = probe.read_manifest(None).await? {
+            let now = chrono::Utc::now();
+            let past_pins = m
+                .checkpoints()
+                .iter()
+                .filter(|c| c.name.is_none())
+                .filter_map(|c| c.expire_time)
+                .max()
+                .map_or(now, |t| t.max(now))
+                + chrono::Duration::seconds(1);
+            builder = builder.with_system_clock(Arc::new(MockSystemClock::with_time(
+                past_pins.timestamp_millis(),
+            )));
+        }
+    }
+    let admin = builder.build();
     admin
         .run_gc_once(GarbageCollectorOptions {
             manifest_options: dir_opts(Duration::from_secs(300)),
@@ -1075,6 +1158,7 @@ mod tests {
             seed_only: false,
             no_wal: false,
             max_garbage: 32 << 30,
+            time_warp: false,
         }
     }
 
