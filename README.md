@@ -146,12 +146,10 @@ transient disk use: peak ≈ target + `--max-garbage` (default 32GiB):
 ```sh
 # One 50GiB DB with ~1600 32MiB SSTs, then churn it:
 cargo run -- traffic --target-size 50GiB
-# Knobs: --value-bytes 4KiB..64KiB, --sst-bytes 32MiB (SST count ≈
-# target/sst-bytes), --seed-only (exit after seeding), --no-wal (halve
-# seed bytes written), --time-warp (expire the compactor's internal
-# 15-minute checkpoints in seconds instead of waiting them out, so
-# seeding runs at raw write speed; only safe while nothing reads the DB).
 ```
+
+See `outcrop traffic --help` for the bulk-seeding knobs (`--value-bytes`,
+`--sst-bytes`, `--seed-only`, `--no-wal`, `--time-warp`).
 
 ## Development
 
