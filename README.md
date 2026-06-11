@@ -19,31 +19,21 @@ decode.
 
 ## Features
 
-- **Works against the bucket, not the database** — reads manifests, SST
-  metadata and object listings straight from object storage. Zero writes,
-  no agent, no cooperation needed from the running writer.
-- **Fleet auto-discovery** — point it at one or more stores (env vars or a
-  TOML config) and every SlateDB under them shows up; no per-DB setup.
-- **Understands SlateDB, not just files** — semantic manifest diffs
-  ("3 L0 SSTs compacted into SR 7"), an activity feed narrating flushes,
-  compactions and GC sweeps, garbage classified live / pinned / reclaimable
-  by the GC's own rules, and health alerts for L0 backlog, WAL growth,
-  stale manifests and stuck GC.
-- **Visualizes the LSM** — levels by size and key-range coverage (overlap
-  reads as read amplification), per-SST drill-down to block index, bloom
-  filter and content stats, segment tabs, and a scrubber that rewinds the
-  tree through manifest history — plus pages for WAL, manifests,
-  compactions, checkpoints, and cross-resource search.
-- **REST API, OpenAPI included** — everything the UI shows is a JSON API,
-  documented by an OpenAPI 3.1 spec with an interactive reference at
-  `/api/docs`; generate typed clients with any OpenAPI generator.
-- **Prometheus metrics** — per-DB gauges at `/metrics`, ready to scrape.
-- **Built to be polled** — object-store reads are cached and shared across
-  viewers, list endpoints are capped, and huge trees ship as bounded
-  summaries, so a wall of open dashboards won't run up your S3 bill.
-- **One binary** — the SPA is embedded; or split it into `--api-only` and
-  `--ui-only` deployments. Includes a demo traffic generator that can seed
-  multi-GiB fleets to explore against.
+- **Reads the bucket, not the database** — zero writes, no agent, no writer
+  cooperation.
+- **Fleet auto-discovery** — point it at stores; every SlateDB in them
+  appears.
+- **Understands SlateDB** — semantic manifest diffs, a narrated activity
+  feed, GC-accurate garbage accounting, health alerts.
+- **Visualizes the LSM** — level sizes, key-range coverage (read amp),
+  per-SST drill-down, manifest-history scrubber.
+- **REST API with OpenAPI** — everything the UI shows is JSON; spec and
+  interactive reference at `/api/docs`.
+- **Prometheus metrics** at `/metrics`.
+- **Cheap to poll** — cached, capped, bounded payloads; open dashboards
+  won't run up your S3 bill.
+- **One binary** — embedded SPA, `--api-only`/`--ui-only` splits, demo
+  data generator included.
 
 ## Running
 
