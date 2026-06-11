@@ -55,7 +55,8 @@ interface Row {
   atOldest?: number
   kind: FeedKind
   text: string
-  link: { to: string; label: string }
+  /** Right-side navigation link; GC rows carry a disclosure instead. */
+  link?: { to: string; label: string }
   /** Compactor-job status badge (failed jobs only). */
   badge?: string
   /** GC rows: the individual deletions behind the aggregate, expandable
@@ -198,7 +199,6 @@ function gcDeletionRows(events: GcEventDto[]): Row[] {
     text: `deleted ${g.events.length} ${GC_KIND_LABEL[g.kind]}${plural(g.events.length)} · ${formatBytes(g.bytes)}${
       g.anomalies > 0 ? ` · ${g.anomalies} still referenced!` : ''
     }`,
-    link: { to: '/garbage', label: 'garbage' },
     // Anomalies first, then biggest objects, so the interesting lines
     // surface at the top of the expansion.
     gcEvents: [...g.events].sort(
@@ -456,9 +456,6 @@ export default function Activity() {
                                 className="min-w-0 flex-1 basis-52 text-left text-sm text-ink-2 hover:text-ink-1"
                               >
                                 {row.text}
-                                <span className="ml-2 text-xs text-ink-5">
-                                  {expanded.has(row.key) ? '▾' : '▸'}
-                                </span>
                               </button>
                             ) : (
                               <span className="min-w-0 flex-1 basis-52 text-sm text-ink-2">
@@ -470,12 +467,41 @@ export default function Activity() {
                                 )}
                               </span>
                             )}
-                            <Link
-                              to={dbPath(row.link.to)}
-                              className="ml-auto shrink-0 font-mono text-xs text-accent hover:text-accent-high"
-                            >
-                              {row.link.label}
-                            </Link>
+                            {row.gcEvents ? (
+                              // Disclosure, not navigation: label + rotating
+                              // chevron, padded to a comfortable tap target
+                              // (negative margin keeps the row height).
+                              <button
+                                onClick={() => toggleExpanded(row.key)}
+                                aria-expanded={expanded.has(row.key)}
+                                className="-my-1 ml-auto flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 font-mono text-xs text-accent hover:bg-surface-2 hover:text-accent-high"
+                              >
+                                details
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className={`transition-transform ${expanded.has(row.key) ? 'rotate-180' : ''}`}
+                                  aria-hidden
+                                >
+                                  <path d="M3 6l5 5 5-5" />
+                                </svg>
+                              </button>
+                            ) : (
+                              row.link && (
+                                <Link
+                                  to={dbPath(row.link.to)}
+                                  className="ml-auto shrink-0 font-mono text-xs text-accent hover:text-accent-high"
+                                >
+                                  {row.link.label}
+                                </Link>
+                              )
+                            )}
                           </li>
                           {row.gcEvents && expanded.has(row.key) && (
                             <li className="border-t border-ink-7/30 bg-surface-2/50 py-1.5 pl-16 pr-4 sm:pl-24">
