@@ -1663,6 +1663,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "outcrop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
+ "clap",
+ "futures",
+ "hex",
+ "lru 0.12.5",
+ "mime_guess",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "slatedb",
+ "slatedb-common",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2416,37 +2447,6 @@ dependencies = [
  "log",
  "serde",
  "tokio",
-]
-
-[[package]]
-name = "slatedb-dashboard"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "chrono",
- "clap",
- "futures",
- "hex",
- "lru 0.12.5",
- "mime_guess",
- "rust-embed",
- "serde",
- "serde_json",
- "slatedb",
- "slatedb-common",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "toml",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "ulid",
- "utoipa",
- "uuid",
 ]
 
 [[package]]

@@ -140,7 +140,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run_serve(args: ServeArgs) -> anyhow::Result<()> {
-    init_tracing("slatedb_dashboard=info,tower_http=info");
+    init_tracing("outcrop=info,tower_http=info");
     // Stores are built BEFORE the tokio runtime exists: building stages
     // provider settings as env vars (slatedb's loaders only read the
     // process env), which is only sound while single-threaded.
@@ -272,7 +272,7 @@ async fn serve(args: ServeArgs, stores: Vec<Store>) -> anyhow::Result<()> {
     let app = app.layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(&args.listen).await?;
-    info!("slatedb-dashboard listening on http://{}", args.listen);
+    info!("outcrop listening on http://{}", args.listen);
     axum::serve(listener, app).await?;
     Ok(())
 }

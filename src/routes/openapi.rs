@@ -13,7 +13,7 @@ use utoipa::OpenApi;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "SlateDB Dashboard API",
+        title = "Outcrop API",
         description = "Read-only REST API for inspecting SlateDB databases directly from \
                        object storage. Databases are auto-discovered and addressed by id \
                        `{store}:{path}`, URL-encoded as a single path segment. The dashboard \
@@ -72,7 +72,7 @@ pub async fn docs() -> Html<&'static str> {
         r#"<!doctype html>
 <html>
   <head>
-    <title>SlateDB Dashboard API</title>
+    <title>Outcrop API</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

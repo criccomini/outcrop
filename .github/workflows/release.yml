@@ -45,9 +45,9 @@ jobs:
 
       - name: Package
         run: |
-          STAGE="slatedb-dashboard-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          STAGE="outcrop-${GITHUB_REF_NAME}-${{ matrix.target }}"
           mkdir "$STAGE"
-          cp target/release/slatedb-dashboard LICENSE README.md "$STAGE"/
+          cp target/release/outcrop LICENSE README.md "$STAGE"/
           tar czf "$STAGE.tar.gz" "$STAGE"
 
       - uses: actions/upload-artifact@v4

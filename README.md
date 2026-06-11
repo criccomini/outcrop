@@ -1,7 +1,9 @@
-# slatedb-dashboard
+# Outcrop
 
-A **read-only** web dashboard for inspecting [SlateDB](https://slatedb.io)
-databases directly from object storage.
+An outcrop is where rock strata surface — visible, layer by layer, without
+digging. **Outcrop** is a **read-only** web dashboard that does the same
+for [SlateDB](https://slatedb.io): it inspects databases directly from
+object storage, layer by layer.
 
 SlateDB keeps all of its state — manifests, WAL SSTs, L0 SSTs, sorted runs,
 checkpoints — in the object store, so the dashboard needs no cooperation from
@@ -57,19 +59,19 @@ page lists every discovered DB; each DB gets its own URLs under `/db/{id}`.
 ```sh
 # Single store from ambient env vars (exactly like slatedb-cli); scans the
 # whole store by default, or scoped prefixes via --root (repeatable).
-CLOUD_PROVIDER=local LOCAL_PATH=/path/to/store slatedb-dashboard
-CLOUD_PROVIDER=aws AWS_BUCKET=my-bucket ... slatedb-dashboard serve --root dbs/
+CLOUD_PROVIDER=local LOCAL_PATH=/path/to/store outcrop
+CLOUD_PROVIDER=aws AWS_BUCKET=my-bucket ... outcrop serve --root dbs/
 
 # Multiple stores via a self-contained TOML config:
-slatedb-dashboard serve --config stores.toml
+outcrop serve --config stores.toml
 
 # REST API only (no UI). CORS defaults to '*' in this mode so a ui-only
 # instance can call it from the browser; restrict with --cors-allow-origin.
-slatedb-dashboard serve --api-only
+outcrop serve --api-only
 
 # UI only: serves just the SPA, with the API base baked into index.html —
 # the browser calls that API directly. No object-store config needed here.
-slatedb-dashboard serve --ui-only --api-url http://api-host:8333
+outcrop serve --ui-only --api-url http://api-host:8333
 ```
 
 `stores.toml` carries each store's provider settings inline, keyed by the

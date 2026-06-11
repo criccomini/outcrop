@@ -161,9 +161,9 @@ pub async fn metrics(State(registry): State<Arc<Registry>>) -> impl IntoResponse
     };
 
     let mut out = String::new();
-    let _ = writeln!(out, "# HELP slatedb_dashboard_scan_up Whether DB discovery succeeded");
-    let _ = writeln!(out, "# TYPE slatedb_dashboard_scan_up gauge");
-    let _ = writeln!(out, "slatedb_dashboard_scan_up {scan_ok}");
+    let _ = writeln!(out, "# HELP outcrop_scan_up Whether DB discovery succeeded");
+    let _ = writeln!(out, "# TYPE outcrop_scan_up gauge");
+    let _ = writeln!(out, "outcrop_scan_up {scan_ok}");
     out.push_str(&render_grouped(&per_db));
 
     ([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)

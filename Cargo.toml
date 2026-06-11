@@ -1,5 +1,5 @@
 [package]
-name = "slatedb-dashboard"
+name = "outcrop"
 version = "0.1.0"
 edition = "2021"
 description = "Read-only web dashboard for SlateDB"

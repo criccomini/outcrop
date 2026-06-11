@@ -38,5 +38,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: slatedb-dashboard-linux-x86_64
-          path: target/release/slatedb-dashboard
+          name: outcrop-linux-x86_64
+          path: target/release/outcrop
