@@ -13,9 +13,16 @@ metadata reads, and object listings.
 Built against SlateDB **0.13.x**; older or newer manifest formats may not
 decode.
 
-![Overview page: sizes, WAL window, epochs, checkpoints, and the storage & garbage breakdown](docs/overview.png)
+<p align="center">
+  <img src="docs/lsm.png" alt="LSM Tree page: levels by size and key-range coverage for a 75 GiB database" width="780" />
+</p>
 
-![LSM Tree page: levels by size and key-range coverage for a 75 GiB database](docs/lsm.png)
+<details>
+<summary><strong>More screenshots</strong></summary>
+<p align="center">
+  <img src="docs/overview.png" alt="Overview page: sizes, WAL window, epochs, checkpoints, and the storage & garbage breakdown" width="780" />
+</p>
+</details>
 
 ## Features
 
