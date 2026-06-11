@@ -15,6 +15,8 @@ slatedb = { version = "0.13.1", features = [
     "zstd",
     "azure",
     "gcp",
+    # Exposes Settings::wal_enabled (default true) for `traffic --no-wal`.
+    "wal_disable",
 ] }
 anyhow = "1"
 axum = "0.8"

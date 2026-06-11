@@ -18,6 +18,15 @@ Always commit after making progress (e.g. after each fix or coherent unit of wor
 cargo run -- traffic                # --dbs N fleet size; --clean wipes ./demo-data first;
                                     # each DB randomly (stably by name) segments or not (--segments overrides)
 
+# Bulk mode: --target-size switches seeding to unthrottled batched writes
+# (embedded compactor + GC running) until the manifest's live bytes reach
+# the target; resumable, since progress is measured from the store. Re-runs
+# against an existing DB must repeat the same flags (key space isn't
+# persisted). SST count ≈ target-size / sst-bytes.
+cargo run -- traffic --target-size 50GiB --seed-only   # defaults: --dbs 1,
+                                    # --value-bytes 4KiB..64KiB, --sst-bytes 32MiB;
+                                    # --no-wal halves seed bytes written
+
 # Run the server (UI + API on 127.0.0.1:8333; LOCAL_PATH must be absolute).
 # DBs are auto-discovered; there is no --path.
 CLOUD_PROVIDER=local LOCAL_PATH=$(pwd)/demo-data cargo run

@@ -6,16 +6,27 @@
 //! compaction pass, checkpoints), then simulates live traffic forever at a
 //! slowly varying rate with the embedded compactor and GC enabled, so the
 //! dashboard can be watched while the DB evolves.
+//!
+//! `--target-size` switches seeding to bulk mode: batched unthrottled
+//! writes with the embedded compactor + GC running concurrently, looping
+//! until the manifest's live bytes reach the target. Bulk seeding is
+//! resumable — progress is measured from the store, so re-running (with the
+//! same flags) tops the DB up rather than starting over.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use slatedb::admin::AdminBuilder;
-use slatedb::config::{CheckpointOptions, PutOptions, Settings, WriteOptions};
+use slatedb::admin::{Admin, AdminBuilder};
+use slatedb::config::{
+    CheckpointOptions, CompactorOptions, FlushOptions, FlushType, GarbageCollectorDirectoryOptions,
+    GarbageCollectorOptions, PutOptions, Settings, WriteOptions,
+};
+use slatedb::manifest::{SortedRun, SsTableView};
 use slatedb::object_store::local::LocalFileSystem;
 use slatedb::object_store::ObjectStore;
 use slatedb::prefix_extractor::{PrefixExtractor, PrefixTarget};
-use slatedb::Db;
+use slatedb::{Db, WriteBatch};
 use tokio_util::sync::CancellationToken;
 
 #[derive(clap::Args, Debug)]
@@ -29,9 +40,10 @@ pub struct TrafficArgs {
     #[arg(long, default_value = "demo-db")]
     path: String,
 
-    /// How many DBs to seed and churn concurrently
-    #[arg(long, default_value_t = 3)]
-    dbs: usize,
+    /// How many DBs to seed and churn concurrently [default: 3, or 1 when
+    /// --target-size is set]
+    #[arg(long)]
+    dbs: Option<usize>,
 
     /// Seed waves when creating a fresh demo DB; each wave ends with a
     /// flush (≈ one L0 SST)
@@ -66,6 +78,143 @@ pub struct TrafficArgs {
     /// fixed at DB creation, so changes need fresh DBs — pair with --clean
     #[arg(long)]
     segments: Option<usize>,
+
+    /// Seed each DB up to this much live data (e.g. 50GiB; binary units,
+    /// KB == KiB) instead of the small demo shape. Bulk seeding writes
+    /// unthrottled batches with the embedded compactor + GC running, and
+    /// resumes: re-running with the same flags tops the DB up to the target
+    #[arg(long, value_parser = parse_size)]
+    target_size: Option<u64>,
+
+    /// Value size, fixed ("512") or a range ("4KiB..64KiB"). Default:
+    /// 64..575 for the demo shape and the traffic phase, 4KiB..64KiB for
+    /// bulk seeding
+    #[arg(long, value_parser = parse_byte_range)]
+    value_bytes: Option<ByteRange>,
+
+    /// Target SST size: the L0 SST size while seeding and the compactor's
+    /// max output SST size. target-size / sst-bytes ≈ final SST count.
+    /// Default: 128KiB for the demo shape, 32MiB for bulk seeding
+    #[arg(long, value_parser = parse_size)]
+    sst_bytes: Option<u64>,
+
+    /// Exit after seeding instead of simulating live traffic
+    #[arg(long)]
+    seed_only: bool,
+
+    /// Seed without a WAL, halving bytes written (seeding only — the
+    /// traffic phase keeps its WAL so the dashboard's WAL page has data)
+    #[arg(long)]
+    no_wal: bool,
+}
+
+/// Size like "1024", "128KiB" or "50gb" in bytes. Units are binary
+/// (KB == KiB); the "i" and "B" suffix parts are optional, any case.
+fn parse_size(s: &str) -> Result<u64, String> {
+    let t = s.trim();
+    let digits = t.find(|c: char| !c.is_ascii_digit()).unwrap_or(t.len());
+    let (num, unit) = t.split_at(digits);
+    let n: u64 = num.parse().map_err(|_| format!("invalid size '{s}'"))?;
+    let unit = unit.trim().to_ascii_lowercase();
+    let mult: u64 = match unit.trim_end_matches('b').trim_end_matches('i') {
+        "" => 1,
+        "k" => 1 << 10,
+        "m" => 1 << 20,
+        "g" => 1 << 30,
+        "t" => 1 << 40,
+        _ => return Err(format!("invalid unit in size '{s}'")),
+    };
+    n.checked_mul(mult)
+        .ok_or_else(|| format!("size '{s}' overflows u64"))
+}
+
+/// Inclusive byte-size range, parsed from "512" or "4KiB..64KiB".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ByteRange {
+    min: u64,
+    max: u64,
+}
+
+impl ByteRange {
+    fn sample(&self, rng: &mut Lcg) -> usize {
+        (self.min + rng.next() % (self.max - self.min + 1)) as usize
+    }
+}
+
+fn parse_byte_range(s: &str) -> Result<ByteRange, String> {
+    let (lo, hi) = match s.split_once("..") {
+        Some((lo, hi)) => (lo, hi),
+        None => (s, s),
+    };
+    let (min, max) = (parse_size(lo)?, parse_size(hi)?);
+    if min == 0 {
+        return Err("value size must be at least 1 byte".to_string());
+    }
+    if max < min {
+        return Err(format!("invalid range '{s}': max below min"));
+    }
+    Ok(ByteRange { min, max })
+}
+
+/// The original demo distribution (64 + r % 512).
+const DEMO_VALUES: ByteRange = ByteRange { min: 64, max: 575 };
+const BULK_VALUES: ByteRange = ByteRange {
+    min: 4 << 10,
+    max: 64 << 10,
+};
+const DEMO_SST_BYTES: u64 = 128 * 1024;
+const BULK_SST_BYTES: u64 = 32 << 20;
+
+/// Per-DB write-shape parameters, derived once from the flags. Every run
+/// against the same DB must use the same flags: the key space and widths
+/// are not persisted, so changing them mid-DB writes a disjoint key set.
+struct Shape {
+    segments: usize,
+    /// Distinct logical key ids the seeder draws from.
+    key_space: u64,
+    /// Zero-pad width of the numeric key part; floored at 8 so demo DBs
+    /// keep their historical "user:00000042" format.
+    key_width: usize,
+    /// Power-of-two-minus-one domain for the churn loop's insert
+    /// bijection; covers the seeded key space with room above it.
+    scatter_mask: u64,
+    /// Seed-phase value sizes (the traffic phase resolves its own).
+    values: ByteRange,
+    sst_bytes: u64,
+}
+
+fn shape_for(args: &TrafficArgs, db_path: &str) -> Shape {
+    let bulk = args.target_size.is_some();
+    let values = args
+        .value_bytes
+        .unwrap_or(if bulk { BULK_VALUES } else { DEMO_VALUES });
+    let sst_bytes = args
+        .sst_bytes
+        .unwrap_or(if bulk { BULK_SST_BYTES } else { DEMO_SST_BYTES });
+    let key_space = match args.target_size {
+        // 2× headroom over the keys the target needs, so random draws keep
+        // finding fresh keys and live size can actually reach the target.
+        Some(target) => {
+            let avg = ((values.min + values.max) / 2).max(1);
+            (target / avg).saturating_mul(2).max(1)
+        }
+        None => ((args.waves * args.keys_per_wave) as u64).max(1),
+    };
+    let key_width = (key_space.saturating_sub(1).max(1).ilog10() as usize + 1).max(8);
+    let scatter_mask = key_space
+        .saturating_mul(2)
+        .checked_next_power_of_two()
+        .unwrap_or(u64::MAX)
+        .max(1 << 26)
+        - 1;
+    Shape {
+        segments: db_segments(args, db_path),
+        key_space,
+        key_width,
+        scatter_mask,
+        values,
+        sst_bytes,
+    }
 }
 
 /// Segment count for one DB: the explicit flag, or a stable pseudo-random
@@ -120,11 +269,11 @@ impl Lcg {
 }
 
 /// Key for logical id `k`: plain, or segment-prefixed when --segments is on.
-fn key_for(segments: usize, k: u64) -> String {
+fn key_for(segments: usize, width: usize, k: u64) -> String {
     if segments == 0 {
-        format!("user:{k:08}")
+        format!("user:{k:0width$}")
     } else {
-        format!("t{:02}/user:{k:08}", k % segments as u64)
+        format!("t{:02}/user:{k:0width$}", k % segments as u64)
     }
 }
 
@@ -138,12 +287,14 @@ fn apply_segments(builder: slatedb::DbBuilder<String>, segments: usize) -> slate
 
 async fn open_seed_db(
     path: &str,
-    segments: usize,
+    shape: &Shape,
+    no_wal: bool,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<Db> {
     let settings = Settings {
         // Small L0 SSTs so a modest amount of data produces a real tree.
-        l0_sst_size_bytes: 128 * 1024,
+        l0_sst_size_bytes: shape.sst_bytes as usize,
+        wal_enabled: !no_wal,
         // Filter every SST regardless of key count so the dashboard's SST
         // drawer has bloom filters to show.
         min_filter_keys: 0,
@@ -163,12 +314,44 @@ async fn open_seed_db(
         ..Settings::default()
     };
     let builder = Db::builder(path.to_string(), store).with_settings(settings);
-    Ok(apply_segments(builder, segments).build().await?)
+    Ok(apply_segments(builder, shape.segments).build().await?)
+}
+
+/// Bulk-seed handle: real-ish SST sizes, and — unlike the demo seed — the
+/// embedded compactor and GC run concurrently. The l0_max_ssts cap doubles
+/// as backpressure: when the compactor falls behind, flushes (and with
+/// them the writer) stall until it catches up. It's raised well above the
+/// default 8, and the compactor polls fast, because with the default
+/// window the writer spends most of its time stalled waiting for the next
+/// 5-second compactor poll.
+async fn open_bulk_db(
+    path: &str,
+    shape: &Shape,
+    no_wal: bool,
+    store: Arc<dyn ObjectStore>,
+) -> anyhow::Result<Db> {
+    let settings = Settings {
+        l0_sst_size_bytes: shape.sst_bytes as usize,
+        min_filter_keys: 0,
+        flush_interval: Some(Duration::from_secs(1)),
+        wal_enabled: !no_wal,
+        l0_max_ssts: 64,
+        l0_max_ssts_per_key: 64,
+        compactor_options: Some(CompactorOptions {
+            poll_interval: Duration::from_millis(500),
+            max_sst_size: shape.sst_bytes as usize,
+            ..CompactorOptions::default()
+        }),
+        ..Settings::default()
+    };
+    let builder = Db::builder(path.to_string(), store).with_settings(settings);
+    Ok(apply_segments(builder, shape.segments).build().await?)
 }
 
 async fn open_traffic_db(
     path: &str,
     segments: usize,
+    sst_bytes: Option<u64>,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<Db> {
     let settings = Settings {
@@ -183,6 +366,14 @@ async fn open_traffic_db(
         // listing (and the dashboard's WAL page) a few hundred entries at
         // GC steady state.
         flush_interval: Some(Duration::from_secs(1)),
+        // Honor --sst-bytes so churn doesn't re-merge a bulk-seeded DB's
+        // many SSTs into default-sized (256MiB) ones.
+        compactor_options: Some(CompactorOptions {
+            max_sst_size: sst_bytes
+                .map(|b| b as usize)
+                .unwrap_or_else(|| CompactorOptions::default().max_sst_size),
+            ..CompactorOptions::default()
+        }),
         ..Settings::default()
     };
     let builder = Db::builder(path.to_string(), store).with_settings(settings);
@@ -193,13 +384,12 @@ async fn write_waves(
     db: &Db,
     tag: &str,
     waves: std::ops::Range<usize>,
-    segments: usize,
+    shape: &Shape,
     args: &TrafficArgs,
     rng: &mut Lcg,
     written: &mut u64,
     deleted: &mut u64,
 ) -> anyhow::Result<()> {
-    let key_space = (args.waves * args.keys_per_wave) as u64;
     // Don't await durability per write — the flush at the end of each wave
     // makes everything durable, and serial durable puts would crawl at the
     // WAL flush interval.
@@ -209,13 +399,13 @@ async fn write_waves(
     };
     for wave in waves {
         for _ in 0..args.keys_per_wave {
-            let k = rng.next() % key_space;
-            let key = key_for(segments, k);
+            let k = rng.next() % shape.key_space;
+            let key = key_for(shape.segments, shape.key_width, k);
             if rng.next() % 10 == 0 && *written > 0 {
                 db.delete_with_options(&key, &write_opts).await?;
                 *deleted += 1;
             } else {
-                let len = 64 + (rng.next() % 512) as usize;
+                let len = shape.values.sample(rng);
                 let value = format!("v{wave}:{key}:")
                     .into_bytes()
                     .into_iter()
@@ -256,7 +446,7 @@ async fn create_checkpoint(
 async fn seed_base(
     args: &TrafficArgs,
     db_path: &str,
-    segments: usize,
+    shape: &Shape,
     store: Arc<dyn ObjectStore>,
 ) -> anyhow::Result<()> {
     let mut rng = Lcg(42);
@@ -270,8 +460,8 @@ async fn seed_base(
     );
 
     // Phase 1: bulk of the data, then a named checkpoint.
-    let db = open_seed_db(db_path, segments, store.clone()).await?;
-    write_waves(&db, db_path, 0..phase1_waves, segments, args, &mut rng, &mut written, &mut deleted)
+    let db = open_seed_db(db_path, shape, args.no_wal, store.clone()).await?;
+    write_waves(&db, db_path, 0..phase1_waves, shape, args, &mut rng, &mut written, &mut deleted)
         .await?;
     db.close().await?;
     create_checkpoint(
@@ -302,12 +492,12 @@ async fn seed_base(
 
     // Phase 3: reopen (bumps writer epoch) and leave fresh L0 SSTs stacked
     // on top of the sorted runs.
-    let db = open_seed_db(db_path, segments, store.clone()).await?;
+    let db = open_seed_db(db_path, shape, args.no_wal, store.clone()).await?;
     write_waves(
         &db,
         db_path,
         phase1_waves..args.waves,
-        segments,
+        shape,
         args,
         &mut rng,
         &mut written,
@@ -321,22 +511,225 @@ async fn seed_base(
     Ok(())
 }
 
+/// Bytes written between live-size re-measurements and progress lines.
+const BULK_TRANCHE_BYTES: u64 = 256 << 20;
+/// WriteBatch granularity: large enough to amortize the write channel,
+/// small enough to stay responsive to Ctrl-C and backpressure.
+const BULK_BATCH_BYTES: usize = 4 << 20;
+const BULK_BATCH_MAX_ENTRIES: usize = 4096;
+
+/// Live data bytes per the latest manifest: every L0 and sorted-run view
+/// across the root tree and all segments. This is what bulk seeding
+/// measures progress against — garbage awaiting GC doesn't inflate it, so
+/// resuming after an interruption (or a re-run with a higher target) tops
+/// the DB up correctly.
+async fn live_bytes(admin: &Admin) -> anyhow::Result<u64> {
+    let Some(m) = admin.read_manifest(None).await? else {
+        return Ok(0);
+    };
+    let mut total = 0u64;
+    let mut add = |l0: &VecDeque<SsTableView>, runs: &[SortedRun]| {
+        total += l0.iter().map(|v| v.estimate_size()).sum::<u64>();
+        total += runs.iter().map(|r| r.estimate_size()).sum::<u64>();
+    };
+    add(m.l0(), m.compacted());
+    for seg in m.segments() {
+        add(seg.l0(), seg.compacted());
+    }
+    Ok(total)
+}
+
+fn fmt_bytes(b: u64) -> String {
+    if b < 1024 {
+        return format!("{b}B");
+    }
+    for (name, size) in [
+        ("TiB", 1u64 << 40),
+        ("GiB", 1 << 30),
+        ("MiB", 1 << 20),
+        ("KiB", 1 << 10),
+    ] {
+        if b >= size {
+            return format!("{:.1}{name}", b as f64 / size as f64);
+        }
+    }
+    unreachable!()
+}
+
+/// Bulk value: tagged with the key for provenance in the SST drawer, then
+/// LCG-filled so sizes stay honest even if compression is ever enabled.
+fn bulk_value(rng: &mut Lcg, key: &str, len: usize) -> Vec<u8> {
+    let mut v = Vec::with_capacity(len + 8);
+    v.extend_from_slice(format!("t:{key}:").as_bytes());
+    v.truncate(len);
+    while v.len() < len {
+        v.extend_from_slice(&rng.next().to_le_bytes());
+    }
+    v.truncate(len);
+    v
+}
+
+/// Unthrottled batched writes until the manifest's live bytes reach
+/// `target`, with the embedded compactor and GC keeping pace. Put-only:
+/// the traffic phase adds deletes/tombstones over time.
+async fn bulk_seed(
+    args: &TrafficArgs,
+    db_path: &str,
+    shape: &Shape,
+    target: u64,
+    store: Arc<dyn ObjectStore>,
+    token: &CancellationToken,
+) -> anyhow::Result<()> {
+    let admin = AdminBuilder::new(db_path.to_string(), store.clone()).build();
+    let mut live = live_bytes(&admin).await?;
+    if live >= target {
+        println!(
+            "[{db_path}] bulk target already met ({} live ≥ {})",
+            fmt_bytes(live),
+            fmt_bytes(target)
+        );
+        // Still worth a pass: seed garbage pinned by the compactor's
+        // 15-minute internal checkpoints becomes collectible on re-runs.
+        collect_seed_garbage(db_path, store).await?;
+        return Ok(());
+    }
+    println!(
+        "[{db_path}] bulk-seeding to {} (values {}..{}, SSTs ~{}, {} keys, wal {}) — \
+         compaction and the WAL need transient extra disk until GC catches up",
+        fmt_bytes(target),
+        fmt_bytes(shape.values.min),
+        fmt_bytes(shape.values.max),
+        fmt_bytes(shape.sst_bytes),
+        shape.key_space,
+        if args.no_wal { "off" } else { "on" },
+    );
+
+    let db = open_bulk_db(db_path, shape, args.no_wal, store.clone()).await?;
+    let write_opts = WriteOptions {
+        await_durable: false,
+        ..Default::default()
+    };
+    let mut rng = Lcg(42);
+    let started = Instant::now();
+    let mut written = 0u64;
+    let mut interrupted = false;
+    'seeding: while live < target {
+        let tranche_cap = BULK_TRANCHE_BYTES.min(target - live);
+        let mut tranche = 0u64;
+        while tranche < tranche_cap {
+            if token.is_cancelled() {
+                interrupted = true;
+                break 'seeding;
+            }
+            let mut batch = WriteBatch::new();
+            let mut batch_bytes = 0usize;
+            let mut entries = 0usize;
+            while batch_bytes < BULK_BATCH_BYTES && entries < BULK_BATCH_MAX_ENTRIES {
+                let k = rng.next() % shape.key_space;
+                let key = key_for(shape.segments, shape.key_width, k);
+                let len = shape.values.sample(&mut rng);
+                let value = bulk_value(&mut rng, &key, len);
+                batch_bytes += key.len() + value.len();
+                batch.put(key, value);
+                entries += 1;
+            }
+            db.write_with_options(batch, &write_opts).await?;
+            tranche += batch_bytes as u64;
+        }
+        written += tranche;
+        // Flush the MEMTABLE, not the WAL: live size is measured from the
+        // manifest, which only advances when memtables land in L0. With
+        // the default WAL flush, up to max_unflushed_bytes of accepted
+        // writes would be invisible to the measurement and the loop would
+        // overshoot the target by that much.
+        db.flush_with_options(FlushOptions {
+            flush_type: FlushType::MemTable,
+        })
+        .await?;
+        live = live_bytes(&admin).await?;
+        let mb_s = written as f64 / 1e6 / started.elapsed().as_secs_f64().max(0.001);
+        println!(
+            "[{db_path}] bulk: {} / {} live · {} written · {mb_s:.0} MB/s",
+            fmt_bytes(live),
+            fmt_bytes(target),
+            fmt_bytes(written),
+        );
+    }
+    println!("[{db_path}] closing (final flush, compactor wind-down) ...");
+    db.close().await?;
+    if interrupted {
+        println!(
+            "[{db_path}] bulk seed interrupted at {} / {} — re-run to resume",
+            fmt_bytes(live),
+            fmt_bytes(target)
+        );
+        return Ok(());
+    }
+    if written > 0 {
+        create_checkpoint(
+            db_path,
+            store.clone(),
+            "bulk-final",
+            Some(Duration::from_secs(24 * 3600)),
+        )
+        .await?;
+    }
+    collect_seed_garbage(db_path, store).await?;
+    println!(
+        "[{db_path}] bulk seed complete: {} live (replaced SSTs stay pinned by the \
+         compactor's 15-minute internal checkpoints; they're GC'd during traffic \
+         mode, or by re-running after the checkpoints expire)",
+        fmt_bytes(live)
+    );
+    Ok(())
+}
+
+/// One aggressive GC pass. A finished seed leaves the WAL plus replaced
+/// SSTs from compaction on disk — several times the target — and with
+/// --seed-only no process sticks around to collect them. Zero min-age is
+/// safe: the GC's compaction-watermark and newest-L0 barriers still
+/// protect anything in flight, and checkpoint pins are honored (the
+/// compactor's internal 15-minute checkpoints keep some garbage alive
+/// until they expire).
+async fn collect_seed_garbage(
+    db_path: &str,
+    store: Arc<dyn ObjectStore>,
+) -> anyhow::Result<()> {
+    println!("[{db_path}] collecting seed garbage (one GC pass) ...");
+    let dir_opts = |min_age| {
+        Some(GarbageCollectorDirectoryOptions {
+            interval: None,
+            min_age,
+        })
+    };
+    let admin = AdminBuilder::new(db_path.to_string(), store).build();
+    admin
+        .run_gc_once(GarbageCollectorOptions {
+            manifest_options: dir_opts(Duration::from_secs(300)),
+            wal_options: dir_opts(Duration::ZERO),
+            compacted_options: dir_opts(Duration::ZERO),
+            compactions_options: dir_opts(Duration::from_secs(300)),
+            detach_options: None,
+        })
+        .await?;
+    Ok(())
+}
+
 /// Per-DB rate factors so the fleet looks heterogeneous in the dashboard.
 const RATE_FACTORS: [f64; 3] = [1.0, 0.45, 0.2];
 
-/// Traffic inserts scatter across a fixed 2^26 keyspace via a
-/// multiplicative bijection (odd constant, power-of-two modulus) instead of
-/// appending ever-increasing ids — otherwise newer SSTs always cover
+/// Traffic inserts scatter across the shape's power-of-two key domain via
+/// a multiplicative bijection (odd constant, power-of-two modulus) instead
+/// of appending ever-increasing ids — otherwise newer SSTs always cover
 /// higher key ranges and the dashboard's key-range view degenerates into a
 /// recency staircase. The bijection keeps inserts collision-free while
 /// letting updates re-derive any existing key from its insertion index.
-const KEYSPACE_MASK: u64 = (1 << 26) - 1;
-
-fn scatter(i: u64) -> u64 {
-    i.wrapping_mul(0x9E37_79B1) & KEYSPACE_MASK
+fn scatter(i: u64, mask: u64) -> u64 {
+    i.wrapping_mul(0x9E37_79B1) & mask
 }
 
-/// Seed one DB when missing, then write puts/deletes until cancelled.
+/// Seed one DB when missing (or below its bulk target), then write
+/// puts/deletes until cancelled.
 async fn run_one(
     args: Arc<TrafficArgs>,
     db_path: String,
@@ -344,7 +737,8 @@ async fn run_one(
     store: Arc<dyn ObjectStore>,
     token: CancellationToken,
 ) -> anyhow::Result<()> {
-    let segments = db_segments(&args, &db_path);
+    let shape = shape_for(&args, &db_path);
+    let segments = shape.segments;
     println!(
         "[{db_path}] {}",
         if segments == 0 {
@@ -354,21 +748,32 @@ async fn run_one(
         }
     );
 
-    let db_dir = std::path::Path::new(&args.dir).join(&db_path);
-    if db_dir.exists() {
-        println!("[{db_path}] found existing demo DB — skipping seed");
-    } else {
-        seed_base(&args, &db_path, segments, store.clone()).await?;
+    match args.target_size {
+        // Bulk mode self-checks against the target, so it always runs:
+        // that's what makes interrupted or grown targets resumable.
+        Some(target) => bulk_seed(&args, &db_path, &shape, target, store.clone(), &token).await?,
+        None => {
+            let db_dir = std::path::Path::new(&args.dir).join(&db_path);
+            if db_dir.exists() {
+                println!("[{db_path}] found existing demo DB — skipping seed");
+            } else {
+                seed_base(&args, &db_path, &shape, store.clone()).await?;
+            }
+        }
+    }
+    if args.seed_only || token.is_cancelled() {
+        return Ok(());
     }
 
     let rate = (args.rate as f64) * RATE_FACTORS[idx % RATE_FACTORS.len()];
     // Stagger the sine phase per DB so the fleet doesn't move in lockstep.
     let phase_offset = (idx as f64) * 60.0;
 
-    let db = open_traffic_db(&db_path, segments, store.clone()).await?;
-    // The seed wrote dense keys [0, seeded); traffic inserts scatter from
-    // index `seeded` upward so they never collide with each other.
-    let seeded = (args.waves * args.keys_per_wave) as u64;
+    let db = open_traffic_db(&db_path, segments, args.sst_bytes, store.clone()).await?;
+    // The seed drew from dense ids [0, seeded); traffic inserts scatter
+    // from index `seeded` upward so they rarely collide with it.
+    let seeded = shape.key_space;
+    let churn_values = args.value_bytes.unwrap_or(DEMO_VALUES);
     let mut inserted: u64 = 0;
     let mut rng = Lcg(0xC0FFEE + idx as u64);
     let write_opts = WriteOptions {
@@ -408,7 +813,7 @@ async fn run_one(
             if j < seeded {
                 j
             } else {
-                scatter(j)
+                scatter(j, shape.scatter_mask)
             }
         };
         for _ in 0..ops {
@@ -416,7 +821,7 @@ async fn run_one(
             if roll == 0 && puts > 0 {
                 // 10% deletes of a random existing key.
                 let k = existing(rng.next(), inserted);
-                db.delete_with_options(key_for(segments, k), &write_opts)
+                db.delete_with_options(key_for(segments, shape.key_width, k), &write_opts)
                     .await?;
                 deletes += 1;
             } else {
@@ -425,12 +830,12 @@ async fn run_one(
                 // fall back to an insert instead of a modulo-by-zero.
                 let k = if roll <= 2 || seeded + inserted == 0 {
                     inserted += 1;
-                    scatter(seeded + inserted - 1)
+                    scatter(seeded + inserted - 1, shape.scatter_mask)
                 } else {
                     existing(rng.next(), inserted)
                 };
-                let key = key_for(segments, k);
-                let len = 64 + (rng.next() % 512) as usize;
+                let key = key_for(segments, shape.key_width, k);
+                let len = churn_values.sample(&mut rng);
                 let value = format!("t:{key}:")
                     .into_bytes()
                     .into_iter()
@@ -484,9 +889,13 @@ async fn run_one(
 }
 
 /// Seed missing demo DBs, then churn all of them concurrently at varied
-/// rates and phases. Returns once every DB has flushed after Ctrl-C.
+/// rates and phases. Returns once every DB has flushed after Ctrl-C (or,
+/// with --seed-only, once seeding finishes).
 pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
-    anyhow::ensure!(args.dbs >= 1, "--dbs must be at least 1");
+    let dbs = args
+        .dbs
+        .unwrap_or(if args.target_size.is_some() { 1 } else { 3 });
+    anyhow::ensure!(dbs >= 1, "--dbs must be at least 1");
     if args.clean {
         let dir = std::path::Path::new(&args.dir);
         if dir.exists() {
@@ -511,9 +920,19 @@ pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
 
     let args = Arc::new(args);
     let token = CancellationToken::new();
+    // Ctrl-C cancels the token; tasks also end on their own with
+    // --seed-only, so join the tasks rather than blocking on the signal.
+    let sigint = tokio::spawn({
+        let token = token.clone();
+        async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                token.cancel();
+            }
+        }
+    });
     let mut handles = Vec::new();
-    for i in 0..args.dbs {
-        let db_path = if args.dbs == 1 {
+    for i in 0..dbs {
+        let db_path = if dbs == 1 {
             args.path.clone()
         } else {
             format!("{}-{}", args.path, i + 1)
@@ -527,12 +946,118 @@ pub async fn run_traffic(args: TrafficArgs) -> anyhow::Result<()> {
         )));
     }
 
-    tokio::signal::ctrl_c().await?;
-    token.cancel();
     for handle in handles {
         if let Err(e) = handle.await? {
             println!("traffic task failed: {e}");
         }
     }
+    sigint.abort();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_size_accepts_binary_units_any_case() {
+        assert_eq!(parse_size("1024"), Ok(1024));
+        assert_eq!(parse_size("7B"), Ok(7));
+        assert_eq!(parse_size("128KiB"), Ok(128 * 1024));
+        assert_eq!(parse_size("128kb"), Ok(128 * 1024));
+        assert_eq!(parse_size("4m"), Ok(4 << 20));
+        assert_eq!(parse_size("50GiB"), Ok(50 << 30));
+        assert_eq!(parse_size("1TiB"), Ok(1 << 40));
+        assert!(parse_size("").is_err());
+        assert!(parse_size("GiB").is_err());
+        assert!(parse_size("12XB").is_err());
+        assert!(parse_size("99999999999TiB").is_err()); // overflow
+    }
+
+    #[test]
+    fn parse_byte_range_forms() {
+        assert_eq!(
+            parse_byte_range("512"),
+            Ok(ByteRange { min: 512, max: 512 })
+        );
+        assert_eq!(
+            parse_byte_range("4KiB..64KiB"),
+            Ok(ByteRange {
+                min: 4 << 10,
+                max: 64 << 10
+            })
+        );
+        assert!(parse_byte_range("8..4").is_err());
+        assert!(parse_byte_range("0").is_err());
+    }
+
+    fn args_with(target_size: Option<u64>) -> TrafficArgs {
+        TrafficArgs {
+            dir: "./demo-data".to_string(),
+            path: "demo-db".to_string(),
+            dbs: None,
+            waves: 12,
+            keys_per_wave: 3000,
+            compact_secs: 10,
+            rate: 150,
+            checkpoint_secs: 120,
+            clean: false,
+            segments: Some(0),
+            target_size,
+            value_bytes: None,
+            sst_bytes: None,
+            seed_only: false,
+            no_wal: false,
+        }
+    }
+
+    #[test]
+    fn demo_shape_matches_historical_format() {
+        let shape = shape_for(&args_with(None), "demo-db");
+        assert_eq!(shape.key_space, 36_000);
+        assert_eq!(shape.key_width, 8);
+        assert_eq!(shape.scatter_mask, (1 << 26) - 1);
+        assert_eq!(shape.values, DEMO_VALUES);
+        assert_eq!(shape.sst_bytes, DEMO_SST_BYTES);
+        assert_eq!(key_for(0, shape.key_width, 42), "user:00000042");
+        assert_eq!(key_for(4, shape.key_width, 42), "t02/user:00000042");
+    }
+
+    #[test]
+    fn bulk_shape_scales_key_space_and_width() {
+        // 100GiB of ~34KiB values needs ~3.2M keys: ×2 headroom, width 8.
+        let shape = shape_for(&args_with(Some(100 << 30)), "demo-db");
+        let avg = (BULK_VALUES.min + BULK_VALUES.max) / 2;
+        assert_eq!(shape.key_space, (100u64 << 30) / avg * 2);
+        assert_eq!(shape.key_width, 8);
+        assert!(shape.scatter_mask + 1 >= shape.key_space * 2);
+        assert_eq!(shape.sst_bytes, BULK_SST_BYTES);
+
+        // Small values push past 10^8 keys and the key format widens.
+        let mut args = args_with(Some(100 << 30));
+        args.value_bytes = Some(ByteRange { min: 512, max: 512 });
+        let shape = shape_for(&args, "demo-db");
+        assert_eq!(shape.key_space, (100u64 << 30) / 512 * 2);
+        assert_eq!(shape.key_width, 9);
+        assert_eq!(key_for(0, shape.key_width, 42), "user:000000042");
+    }
+
+    #[test]
+    fn scatter_is_a_bijection_on_the_mask_domain() {
+        let mask = (1u64 << 16) - 1;
+        let mut seen = std::collections::HashSet::new();
+        for i in 0..=mask {
+            assert!(seen.insert(scatter(i, mask)));
+        }
+    }
+
+    #[test]
+    fn byte_range_sampling_stays_inclusive() {
+        let mut rng = Lcg(7);
+        let r = ByteRange { min: 64, max: 575 };
+        for _ in 0..10_000 {
+            let len = r.sample(&mut rng);
+            assert!((64..=575).contains(&len));
+        }
+    }
 }
