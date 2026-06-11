@@ -13,6 +13,11 @@ use crate::state::AppState;
 /// thousands of blocks.
 const MAX_INDEX_BLOCKS: usize = 2000;
 
+#[utoipa::path(get, path = "/api/dbs/{db}/ssts/{ulid}", tag = "ssts", params(crate::routes::DbPathParam, ("ulid" = String, Path, description = "Compacted SST ULID")), responses(
+    (status = 200, description = "SST metadata, stats and block index", body = SstDetailDto),
+    (status = 400, description = "Invalid ULID", body = crate::dto::ErrorDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn get_one(
     State(state): State<Arc<AppState>>,
     Path(ulid_str): Path<String>,

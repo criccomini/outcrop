@@ -8,11 +8,16 @@ use crate::dto::{WalDto, WalSstDto};
 use crate::error::ApiError;
 use crate::state::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct WalParams {
     limit: Option<usize>,
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/wal", tag = "wal", params(crate::routes::DbPathParam, WalParams), responses(
+    (status = 200, description = "WAL SST listing and replay window", body = WalDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn wal(
     State(state): State<Arc<AppState>>,
     Query(params): Query<WalParams>,

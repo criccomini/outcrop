@@ -9,6 +9,10 @@ use crate::dto::{CheckpointStatusDto, ExternalDbDto};
 use crate::error::ApiError;
 use crate::state::AppState;
 
+#[utoipa::path(get, path = "/api/dbs/{db}/checkpoints", tag = "checkpoints", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Checkpoints in the latest manifest with target availability", body = Vec<CheckpointStatusDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<CheckpointStatusDto>>, ApiError> {
@@ -32,6 +36,10 @@ pub async fn list(
     Ok(Json(out))
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/clones", tag = "checkpoints", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "External DBs cloned from this one", body = Vec<ExternalDbDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn clones(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ExternalDbDto>>, ApiError> {

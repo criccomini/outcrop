@@ -11,6 +11,10 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use crate::warnings::{compute_warnings, WarningInputs};
 
+#[utoipa::path(get, path = "/api/dbs/{db}/overview", tag = "overview", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Headline stats and health warnings", body = OverviewDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn overview(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<OverviewDto>, ApiError> {

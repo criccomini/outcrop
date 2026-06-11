@@ -42,6 +42,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = { version = "1", features = ["serde"] }
 uuid = { version = "1", features = ["serde"] }
+utoipa = { version = "5.5.0", features = ["chrono"] }
 
 [dev-dependencies]
 async-trait = "0.1"

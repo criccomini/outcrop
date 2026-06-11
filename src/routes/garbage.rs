@@ -90,6 +90,10 @@ async fn gc_cutoff(
 /// Deletions observed by diffing consecutive listing refreshes (the GC
 /// itself leaves no record). Refreshes the listings first so the feed is
 /// as current as a poll can make it.
+#[utoipa::path(get, path = "/api/dbs/{db}/garbage/events", tag = "garbage", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Deletions observed by diffing consecutive listings (per-process, in-memory)", body = GcEventsDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn gc_events(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<GcEventsDto>, ApiError> {
@@ -103,6 +107,10 @@ pub async fn gc_events(
     }))
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/garbage", tag = "garbage", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Space-amplification report: live / pinned / reclaimable per object class", body = GarbageDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn garbage(State(state): State<Arc<AppState>>) -> Result<Json<GarbageDto>, ApiError> {
     let manifest = state.latest_manifest().await?;
     let Some(m) = manifest.as_ref() else {

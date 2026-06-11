@@ -6,6 +6,7 @@ mod garbage;
 mod lsm;
 mod manifests;
 mod metrics;
+mod openapi;
 mod overview;
 mod search;
 mod ssts;
@@ -18,6 +19,17 @@ use axum::Router;
 
 use crate::registry::Registry;
 use crate::state::AppState;
+
+/// Path parameter shared by every per-DB route — documentation only; the
+/// dispatcher extracts it before requests reach the per-DB routers.
+#[derive(serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Path)]
+#[allow(dead_code)]
+pub struct DbPathParam {
+    /// Database id `{store}:{path}`, URL-encoded as one path segment
+    /// (e.g. `default%3Ademo-db-1`).
+    pub db: String,
+}
 
 /// Routes for one DB. Mounted per discovered DB behind the dispatcher,
 /// which rewrites `/api/dbs/{db}/…` to the `/api/…` paths used here.
@@ -52,6 +64,8 @@ pub fn root_router(registry: Arc<Registry>) -> Router {
         .route("/api/health", get(dbs::health))
         .route("/api/dbs", get(dbs::list))
         .route("/api/dbs/{db}/{*rest}", any(dbs::dispatch))
+        .route("/api/openapi.json", get(openapi::spec))
+        .route("/api/docs", get(openapi::docs))
         .route("/metrics", get(metrics::metrics))
         .with_state(registry)
 }

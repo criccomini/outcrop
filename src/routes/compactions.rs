@@ -10,6 +10,10 @@ use crate::dto::{CompactionDto, CompactorStateDto, VersionedCompactionsDto};
 use crate::error::ApiError;
 use crate::state::AppState;
 
+#[utoipa::path(get, path = "/api/dbs/{db}/compactor/state", tag = "compactions", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Current compactor state: manifest id plus the live compactions file", body = CompactorStateDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn state(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<CompactorStateDto>, ApiError> {
@@ -17,7 +21,8 @@ pub async fn state(
     Ok(Json((*dto).clone()))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ListParams {
     start: Option<u64>,
     end: Option<u64>,
@@ -26,6 +31,10 @@ pub struct ListParams {
 
 /// History of `.compactions` file versions, newest first. Each version is
 /// one GET, so the default range is anchored to the latest id.
+#[utoipa::path(get, path = "/api/dbs/{db}/compactions", tag = "compactions", params(crate::routes::DbPathParam, ListParams), responses(
+    (status = 200, description = "History of .compactions file versions, newest first (limit capped at 200)", body = Vec<VersionedCompactionsDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListParams>,
@@ -57,11 +66,17 @@ pub async fn list(
     Ok(Json(out))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct GetParams {
     version: Option<u64>,
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/compactions/{ulid}", tag = "compactions", params(crate::routes::DbPathParam, ("ulid" = String, Path, description = "Compaction ULID"), GetParams), responses(
+    (status = 200, description = "One compaction job", body = CompactionDto),
+    (status = 400, description = "Invalid ULID", body = crate::dto::ErrorDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn get_one(
     State(state): State<Arc<AppState>>,
     Path(ulid_str): Path<String>,

@@ -11,12 +11,17 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use crate::summary;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct LsmParams {
     /// Render the tree as of this manifest instead of the latest.
     manifest_id: Option<u64>,
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/lsm", tag = "lsm", params(crate::routes::DbPathParam, LsmParams), responses(
+    (status = 200, description = "Full LSM tree dump; can be very large — prefer /lsm/summary", body = LsmDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn lsm(
     State(state): State<Arc<AppState>>,
     Query(params): Query<LsmParams>,
@@ -47,7 +52,8 @@ pub async fn lsm(
     }))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct LsmSummaryParams {
     /// Summarize as of this manifest instead of the latest.
     manifest_id: Option<u64>,
@@ -58,6 +64,11 @@ pub struct LsmSummaryParams {
 
 /// Summary-first LSM view. Cheap for any tree size: full conversion runs
 /// at most once per (manifest, segment) thanks to the immutable cache.
+#[utoipa::path(get, path = "/api/dbs/{db}/lsm/summary", tag = "lsm", params(crate::routes::DbPathParam, LsmSummaryParams), responses(
+    (status = 200, description = "Per-level aggregates plus a key-coverage histogram; bounded payload for any tree size", body = LsmSummaryDto),
+    (status = 400, description = "Segment out of range", body = crate::dto::ErrorDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn lsm_summary(
     State(state): State<Arc<AppState>>,
     Query(params): Query<LsmSummaryParams>,
@@ -92,7 +103,8 @@ pub async fn lsm_summary(
     build_summary(&state, m, params.segment, seg_key)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct LevelSliceParams {
     /// Slice as of this manifest instead of the latest.
     manifest_id: Option<u64>,
@@ -111,6 +123,11 @@ pub struct LevelSliceParams {
 /// On-demand per-SST drill-down for one level restricted to a key range —
 /// how the UI reaches SSTs in levels too large for summary detail. Pure
 /// CPU over the cached manifest; no object-store requests.
+#[utoipa::path(get, path = "/api/dbs/{db}/lsm/level", tag = "lsm", params(crate::routes::DbPathParam, LevelSliceParams), responses(
+    (status = 200, description = "SSTs of one level overlapping a key range", body = LevelSliceDto),
+    (status = 400, description = "Segment out of range", body = crate::dto::ErrorDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn level_slice(
     State(state): State<Arc<AppState>>,
     Query(params): Query<LevelSliceParams>,

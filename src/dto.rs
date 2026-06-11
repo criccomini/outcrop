@@ -1,21 +1,28 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+/// Error body every endpoint returns on failure (see `ApiError`); declared
+/// here so the OpenAPI document can reference it.
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
+pub struct ErrorDto {
+    pub error: String,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct KeyDto {
     pub hex: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub utf8: Option<String>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct BoundDto {
     pub key: KeyDto,
     pub inclusive: bool,
 }
 
 /// A key range; a missing bound means unbounded on that side.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct RangeDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<BoundDto>,
@@ -23,14 +30,14 @@ pub struct RangeDto {
     pub end: Option<BoundDto>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SstIdDto {
     Wal { id: u64 },
     Compacted { ulid: String },
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct SstViewDto {
     pub view_id: String,
     pub sst_id: SstIdDto,
@@ -45,14 +52,14 @@ pub struct SstViewDto {
     pub visible_range: Option<RangeDto>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct SortedRunDto {
     pub id: u32,
     pub est_bytes: u64,
     pub ssts: Vec<SstViewDto>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct TreeDto {
     pub l0: Vec<SstViewDto>,
     pub runs: Vec<SortedRunDto>,
@@ -60,13 +67,13 @@ pub struct TreeDto {
     pub total_bytes: u64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct SegmentDto {
     pub prefix: KeyDto,
     pub tree: TreeDto,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct CheckpointDto {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -77,7 +84,7 @@ pub struct CheckpointDto {
     pub expire_time: Option<DateTime<Utc>>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct CheckpointStatusDto {
     #[serde(flatten)]
     pub checkpoint: CheckpointDto,
@@ -85,7 +92,7 @@ pub struct CheckpointStatusDto {
     pub manifest_available: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct ExternalDbDto {
     pub path: String,
     pub source_checkpoint_id: String,
@@ -96,7 +103,7 @@ pub struct ExternalDbDto {
     pub detached: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct ManifestDto {
     pub id: u64,
     pub initialized: bool,
@@ -121,13 +128,13 @@ pub struct ManifestDto {
 
 /// Lightweight manifest listing entry: built from the object-store LIST
 /// alone, without fetching any manifest contents.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct ManifestIdDto {
     pub id: u64,
     pub last_modified: DateTime<Utc>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct ManifestSummaryDto {
     pub id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -141,15 +148,17 @@ pub struct ManifestSummaryDto {
     pub checkpoint_count: usize,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct WarningDto {
+    #[schema(value_type = String)]
     pub code: &'static str,
     /// "info" | "warn" | "error"
+    #[schema(value_type = String)]
     pub severity: &'static str,
     pub message: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct OverviewDto {
     pub db_path: String,
     pub provider: String,
@@ -181,7 +190,7 @@ pub struct OverviewDto {
     pub warnings: Vec<WarningDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct LsmDto {
     pub manifest_id: u64,
     pub tree: TreeDto,
@@ -192,7 +201,7 @@ pub struct LsmDto {
 
 /// Per-level aggregate for the summary LSM view. `ssts` is present only
 /// when the level is small enough to render SSTs individually.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct LevelSummaryDto {
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -207,7 +216,7 @@ pub struct LevelSummaryDto {
 }
 
 /// Segment descriptor without tree contents: enough for tabs and totals.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct SegmentMetaDto {
     pub prefix: KeyDto,
     pub sst_count: usize,
@@ -216,7 +225,7 @@ pub struct SegmentMetaDto {
 
 /// Summary-first LSM payload: O(levels × buckets) regardless of how many
 /// SSTs the tree holds, so huge DBs render without shipping every SST.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct LsmSummaryDto {
     pub manifest_id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -236,7 +245,7 @@ pub struct LsmSummaryDto {
     pub l0_bytes: u64,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SstInfoDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_key: Option<KeyDto>,
@@ -254,7 +263,7 @@ pub struct SstInfoDto {
     pub filter_format: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SstStatsDto {
     pub num_puts: u64,
     pub num_deletes: u64,
@@ -265,20 +274,20 @@ pub struct SstStatsDto {
     pub block_count: usize,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct BlockMetaDto {
     pub offset: u64,
     pub first_key: KeyDto,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct BlockIndexDto {
     pub blocks: Vec<BlockMetaDto>,
     pub total_blocks: usize,
     pub truncated: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SstDetailDto {
     pub ulid: String,
     pub location: String,
@@ -290,19 +299,19 @@ pub struct SstDetailDto {
     pub index: BlockIndexDto,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SourceDto {
     pub kind: String,
     pub id: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct OutputSstDto {
     pub sst_id: SstIdDto,
     pub est_bytes: u64,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct CompactionDto {
     pub id: String,
     pub status: String,
@@ -317,14 +326,14 @@ pub struct CompactionDto {
     pub active: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct VersionedCompactionsDto {
     pub id: u64,
     pub compactor_epoch: u64,
     pub compactions: Vec<CompactionDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct CompactorStateDto {
     pub manifest_id: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -334,7 +343,7 @@ pub struct CompactorStateDto {
 /// On-demand SST listing for one level (L0 or a sorted run) restricted to
 /// a key range — the drill-down for levels too large for per-SST detail
 /// in the summary payload.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct LevelSliceDto {
     /// SSTs in the level overlapping the requested range.
     pub total: usize,
@@ -342,36 +351,39 @@ pub struct LevelSliceDto {
     pub ssts: Vec<SstViewDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SortedRunSummaryDto {
     pub id: u32,
     pub est_bytes: u64,
     pub sst_count: usize,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct RunChangeDto {
     pub id: u32,
     pub ssts_added: Vec<SstViewDto>,
     pub ssts_removed: Vec<SstViewDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct CheckpointChangeDto {
     pub id: String,
     /// (value in a, value in b)
+    #[schema(value_type = Vec<u64>, max_items = 2, min_items = 2)]
     pub manifest_id: (u64, u64),
+    /// (value in a, value in b); null = no expiry.
+    #[schema(value_type = Vec<Option<String>>, max_items = 2, min_items = 2)]
     pub expire_time: (Option<DateTime<Utc>>, Option<DateTime<Utc>>),
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct ScalarChangeDto {
     pub field: String,
     pub a: String,
     pub b: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct ManifestDiffDto {
     pub a: u64,
     pub b: u64,
@@ -390,14 +402,14 @@ pub struct ManifestDiffDto {
     pub scalars: Vec<ScalarChangeDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct WalSstDto {
     pub id: u64,
     pub size_bytes: u64,
     pub last_modified: DateTime<Utc>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct WalDto {
     pub next_wal_sst_id: u64,
     pub replay_after_wal_id: u64,
@@ -411,13 +423,13 @@ pub struct WalDto {
 }
 
 /// Aggregate view of one SST-list change: enough for a feed line.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct SstDeltaDto {
     pub count: usize,
     pub bytes: u64,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, utoipa::ToSchema)]
 pub struct RunChangeSummaryDto {
     pub id: u32,
     pub added: SstDeltaDto,
@@ -428,7 +440,7 @@ pub struct RunChangeSummaryDto {
 /// signal as [`ManifestDiffDto`] without the per-SST lists, so payloads
 /// stay bounded however churny the transition. The full diff is one click
 /// away on the manifest-diff page.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct DiffSummaryDto {
     pub l0_added: SstDeltaDto,
     pub l0_removed: SstDeltaDto,
@@ -446,7 +458,7 @@ pub struct DiffSummaryDto {
 }
 
 /// One manifest transition (a → b) in the activity feed.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct ActivityDto {
     pub a: u64,
     pub b: u64,
@@ -455,8 +467,9 @@ pub struct ActivityDto {
     pub diff: DiffSummaryDto,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct HealthDto {
+    #[schema(value_type = String)]
     pub status: &'static str,
     pub store_count: usize,
     /// Discovered DBs as of the last scan; absent before the first scan.
@@ -464,7 +477,7 @@ pub struct HealthDto {
     pub db_count: Option<usize>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct DbInfoDto {
     /// "{store}:{path}" — the URL-safe identity used by /api/dbs/{id}.
     pub id: String,
@@ -472,7 +485,7 @@ pub struct DbInfoDto {
     pub path: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct DbsDto {
     pub scanned_at: DateTime<Utc>,
     pub dbs: Vec<DbInfoDto>,
@@ -480,9 +493,10 @@ pub struct DbsDto {
 
 /// One object observed to have disappeared from a listing between two
 /// refreshes — almost always a GC deletion.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct GcEventDto {
     /// "compacted" | "wal" | "manifest"
+    #[schema(value_type = String)]
     pub kind: &'static str,
     /// ULID for compacted SSTs, numeric id for WAL SSTs and manifests.
     pub id: String,
@@ -499,7 +513,7 @@ pub struct GcEventDto {
     pub referenced: Option<bool>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct GcEventsDto {
     /// Observation starts when this server first listed the DB; sweeps
     /// before that (or while no dashboard is running) are not recorded.
@@ -508,14 +522,14 @@ pub struct GcEventsDto {
     pub events: Vec<GcEventDto>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SearchSstObjectDto {
     pub location: String,
     pub size_bytes: u64,
     pub last_modified: DateTime<Utc>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SearchManifestHitDto {
     pub id: u64,
     /// Where in the tree the ULID matched, e.g. "SST in SR 3" or
@@ -523,16 +537,17 @@ pub struct SearchManifestHitDto {
     pub places: Vec<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SearchCompactionHitDto {
     /// Newest .compactions version containing this hit.
     pub version: u64,
     pub job_id: String,
     /// "job" (the ULID is the job id) or "output" (an output SST).
+    #[schema(value_type = String)]
     pub role: &'static str,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SearchCheckpointHitDto {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -540,7 +555,7 @@ pub struct SearchCheckpointHitDto {
     pub manifest_id: u64,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct SearchDto {
     pub query: String,
     /// The compacted SST object itself, when it exists in the store.
@@ -557,7 +572,7 @@ pub struct SearchDto {
 /// Per-directory breakdown of stored objects: live (referenced by the latest
 /// manifest), pinned (kept alive only by an unexpired checkpoint), and
 /// reclaimable (what the GC would eventually delete).
-#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq, utoipa::ToSchema)]
 pub struct GarbageCategoryDto {
     pub stored_count: usize,
     pub stored_bytes: u64,
@@ -571,7 +586,7 @@ pub struct GarbageCategoryDto {
 
 /// One unexpired checkpoint and how much storage it keeps alive beyond
 /// what the latest manifest already references.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct GarbagePinnerDto {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -585,7 +600,7 @@ pub struct GarbagePinnerDto {
     pub extra_count: usize,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, utoipa::ToSchema)]
 pub struct GarbageDto {
     pub manifest_id: u64,
     pub live_checkpoint_count: usize,

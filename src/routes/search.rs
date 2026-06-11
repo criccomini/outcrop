@@ -21,7 +21,8 @@ const MANIFEST_HIT_LIMIT: usize = 20;
 /// Recent .compactions versions swept.
 const COMPACTIONS_SCAN_LIMIT: u64 = 30;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct SearchParams {
     q: String,
 }
@@ -67,6 +68,10 @@ fn manifest_places(m: &VersionedManifest, ulid: &Ulid) -> Vec<String> {
 /// ULID search across the DB: the SST object itself, manifests whose trees
 /// reference it (as an SST id or an L0 view id), compactor jobs (by job id
 /// or output SST), and — when the query parses as a UUID — checkpoints.
+#[utoipa::path(get, path = "/api/dbs/{db}/search", tag = "search", params(crate::routes::DbPathParam, SearchParams), responses(
+    (status = 200, description = "Matches across manifests, checkpoints, SSTs and compactions", body = SearchDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn search(
     State(state): State<Arc<AppState>>,
     Query(params): Query<SearchParams>,

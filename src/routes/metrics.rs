@@ -143,6 +143,9 @@ fn render_grouped(per_db: &[(String, Vec<Gauge>)]) -> String {
 }
 
 /// Prometheus metrics for every discovered DB, labeled `db="store:path"`.
+#[utoipa::path(get, path = "/metrics", tag = "fleet", responses(
+    (status = 200, description = "Prometheus exposition for every discovered DB", content_type = "text/plain", body = String),
+))]
 pub async fn metrics(State(registry): State<Arc<Registry>>) -> impl IntoResponse {
     let mut per_db: Vec<(String, Vec<Gauge>)> = Vec::new();
     let scan_ok = match registry.scan(false).await {

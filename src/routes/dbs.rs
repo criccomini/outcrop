@@ -11,6 +11,9 @@ use crate::dto::{DbInfoDto, DbsDto, HealthDto};
 use crate::error::ApiError;
 use crate::registry::Registry;
 
+#[utoipa::path(get, path = "/api/health", tag = "fleet", responses(
+    (status = 200, description = "Service health and fleet counts", body = HealthDto),
+))]
 pub async fn health(State(registry): State<Arc<Registry>>) -> Json<HealthDto> {
     Json(HealthDto {
         status: "ok",
@@ -19,12 +22,16 @@ pub async fn health(State(registry): State<Arc<Registry>>) -> Json<HealthDto> {
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DbsParams {
     /// Present (any value) to bypass the scan cache.
     rescan: Option<String>,
 }
 
+#[utoipa::path(get, path = "/api/dbs", tag = "fleet", params(DbsParams), responses(
+    (status = 200, description = "Databases discovered across all configured stores", body = DbsDto),
+))]
 pub async fn list(
     State(registry): State<Arc<Registry>>,
     Query(params): Query<DbsParams>,

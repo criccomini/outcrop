@@ -10,7 +10,8 @@ use crate::dto::{ActivityDto, ManifestDto};
 use crate::error::ApiError;
 use crate::state::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ListParams {
     limit: Option<usize>,
 }
@@ -19,6 +20,10 @@ pub struct ListParams {
 /// against its predecessor. Transitions are immutable, so each (a, b) pair
 /// is computed once and served from the LRU after that — a steady-state
 /// poll only pays for pairs that appeared since the last one.
+#[utoipa::path(get, path = "/api/dbs/{db}/activity", tag = "activity", params(crate::routes::DbPathParam, ListParams), responses(
+    (status = 200, description = "Recent manifest transitions, newest first", body = Vec<ActivityDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListParams>,

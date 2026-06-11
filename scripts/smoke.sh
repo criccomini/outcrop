@@ -75,4 +75,8 @@ STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/dbs/nope%3Amissing/overv
 # /metrics is root-level (Prometheus convention), not under /api.
 curl -fsS "http://$HOST/metrics" | grep -q '^slatedb_up' || fail "metrics"
 
+# OpenAPI document and reference UI.
+curl -fsS "$BASE/openapi.json" | jq -e '.openapi and (.paths | length) >= 20' > /dev/null || fail "openapi.json"
+curl -fsS "$BASE/docs" | grep -q "api-reference" || fail "docs page"
+
 echo "all endpoints OK"

@@ -12,6 +12,10 @@ use crate::state::AppState;
 
 /// All retained manifest ids with timestamps, ascending. Served straight
 /// from the cached listing — zero per-manifest GETs, unlike `list`.
+#[utoipa::path(get, path = "/api/dbs/{db}/manifests/ids", tag = "manifests", params(crate::routes::DbPathParam), responses(
+    (status = 200, description = "Every manifest version in the store, ascending (no content reads)", body = Vec<ManifestIdDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn ids(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ManifestIdDto>>, ApiError> {
@@ -27,7 +31,8 @@ pub async fn ids(
     ))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ListParams {
     start: Option<u64>,
     end: Option<u64>,
@@ -36,6 +41,10 @@ pub struct ListParams {
 
 /// Manifest summaries, newest first. Each summary costs one manifest GET on
 /// a cold cache, so the range is capped.
+#[utoipa::path(get, path = "/api/dbs/{db}/manifests", tag = "manifests", params(crate::routes::DbPathParam, ListParams), responses(
+    (status = 200, description = "Manifest summaries, newest first (each costs one manifest read; limit capped at 500)", body = Vec<ManifestSummaryDto>),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListParams>,
@@ -75,6 +84,10 @@ pub async fn list(
     Ok(Json(out))
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/manifests/{id}", tag = "manifests", params(crate::routes::DbPathParam, ("id" = u64, Path, description = "Manifest id")), responses(
+    (status = 200, description = "One manifest version in full", body = ManifestDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn get_one(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -100,12 +113,17 @@ pub async fn get_one(
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DiffParams {
     a: u64,
     b: u64,
 }
 
+#[utoipa::path(get, path = "/api/dbs/{db}/manifests/diff", tag = "manifests", params(crate::routes::DbPathParam, DiffParams), responses(
+    (status = 200, description = "Structural diff between two manifest versions", body = ManifestDiffDto),
+    (status = 404, description = "Unknown database or missing resource", body = crate::dto::ErrorDto),
+))]
 pub async fn diff(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DiffParams>,
