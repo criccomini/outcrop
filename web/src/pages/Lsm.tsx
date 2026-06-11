@@ -188,6 +188,8 @@ export default function Lsm() {
                 <KeyRangeView
                   levels={lsm.levels}
                   bucketKeys={lsm.bucket_keys}
+                  manifestId={lsm.manifest_id}
+                  segment={lsm.segment}
                   selected={selected}
                   onSelect={setSelected}
                 />

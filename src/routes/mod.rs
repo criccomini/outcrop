@@ -27,6 +27,7 @@ pub fn api_router(state: Arc<AppState>) -> Router {
         .route("/api/activity", get(activity::list))
         .route("/api/lsm", get(lsm::lsm))
         .route("/api/lsm/summary", get(lsm::lsm_summary))
+        .route("/api/lsm/level", get(lsm::level_slice))
         .route("/api/wal", get(wal::wal))
         .route("/api/manifests", get(manifests::list))
         .route("/api/manifests/ids", get(manifests::ids))

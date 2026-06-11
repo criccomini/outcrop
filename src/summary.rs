@@ -88,6 +88,34 @@ fn tree_sst_count(t: &TreeDto) -> usize {
     t.l0.len() + t.runs.iter().map(|r| r.ssts.len()).sum::<usize>()
 }
 
+/// SSTs of one level (L0 when `run` is None, else that sorted run) whose
+/// effective (visibility-clamped) key range overlaps `[start, end]` — hex
+/// bounds as in `KeyDto::hex`, `None` end = unbounded. Returns the
+/// overlapping total and at most `cap` of them; None when the run id
+/// doesn't exist in the tree.
+pub fn slice_level(
+    tree: &TreeDto,
+    run: Option<u32>,
+    start: &str,
+    end: Option<&str>,
+    cap: usize,
+) -> Option<(usize, Vec<SstViewDto>)> {
+    let ssts: &[SstViewDto] = match run {
+        None => &tree.l0,
+        Some(id) => &tree.runs.iter().find(|r| r.id == id)?.ssts,
+    };
+    let hits: Vec<&SstViewDto> = ssts
+        .iter()
+        .filter(|s| {
+            effective_bounds(s).is_some_and(|(f, l)| {
+                l.hex.as_str() >= start && end.is_none_or(|e| f.hex.as_str() <= e)
+            })
+        })
+        .collect();
+    let total = hits.len();
+    Some((total, hits.into_iter().take(cap).cloned().collect()))
+}
+
 /// One level per L0 + sorted run, each with a coverage histogram over the
 /// tree's key space, rank-scaled by distinct SST boundary keys (the same
 /// scaling the per-SST view uses) so skewed keyspaces stay readable.
@@ -414,5 +442,45 @@ mod tests {
     fn summarize_rejects_out_of_range_segment() {
         let m = manifest(tree(vec![], vec![]), vec![]);
         assert!(summarize(&m, Some(0)).is_none());
+    }
+
+    #[test]
+    fn slice_level_filters_by_overlap_and_caps() {
+        let t = tree(
+            vec![sst("a", "c", 1)],
+            vec![run(
+                7,
+                vec![sst("a", "f", 5), sst("g", "m", 5), sst("n", "z", 5)],
+            )],
+        );
+        // Range g..h overlaps only the middle SST of run 7.
+        let (total, ssts) =
+            slice_level(&t, Some(7), &hex::encode("g"), Some(&hex::encode("h")), 10).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(ssts[0].first_key.as_ref().unwrap().utf8.as_deref(), Some("g"));
+        // Unbounded end from "g" hits the last two.
+        let (total, _) = slice_level(&t, Some(7), &hex::encode("g"), None, 10).unwrap();
+        assert_eq!(total, 2);
+        // L0 (run = None), full range, capped at 1 with truncation visible.
+        let (total, ssts) = slice_level(&t, None, "", None, 1).unwrap();
+        assert_eq!((total, ssts.len()), (1, 1));
+        let (total, ssts) = slice_level(&t, Some(7), "", None, 2).unwrap();
+        assert_eq!((total, ssts.len()), (3, 2));
+        // Unknown run id.
+        assert!(slice_level(&t, Some(9), "", None, 10).is_none());
+    }
+
+    #[test]
+    fn slice_level_respects_visible_range() {
+        // Physical a..z but only c..f visible: a probe at x must miss it.
+        let t = tree(
+            vec![visible(sst("a", "z", 10), Some("c"), Some("f"))],
+            vec![],
+        );
+        let (total, _) = slice_level(&t, None, &hex::encode("x"), None, 10).unwrap();
+        assert_eq!(total, 0);
+        let (total, _) =
+            slice_level(&t, None, &hex::encode("c"), Some(&hex::encode("d")), 10).unwrap();
+        assert_eq!(total, 1);
     }
 }

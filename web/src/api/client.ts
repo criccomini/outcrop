@@ -12,6 +12,7 @@ import type {
   GarbageDto,
   GcEventsDto,
   HealthDto,
+  LevelSliceDto,
   LsmSummaryDto,
   ManifestDiffDto,
   ManifestDto,
@@ -187,6 +188,37 @@ export function useLsmSummary(manifestId?: number, segment?: number) {
     queryFn: () => fetchJson(`${api(db)}/lsm/summary${suffix}`),
     meta: manifestId === undefined ? { live: true } : undefined,
     placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * Per-SST drill-down for one level (L0 when `run` is undefined) within a
+ * key range — how histogram-only levels reach individual SSTs. Fetched on
+ * demand (bucket click), not polled; manifests are immutable so the
+ * result never goes stale.
+ */
+export function useLevelSlice(
+  params: {
+    manifestId: number
+    segment?: number
+    run?: number
+    start?: string
+    end?: string
+  } | null,
+) {
+  const db = useDbId()
+  const qs = new URLSearchParams()
+  if (params) {
+    qs.set('manifest_id', String(params.manifestId))
+    if (params.segment !== undefined) qs.set('segment', String(params.segment))
+    if (params.run !== undefined) qs.set('run', String(params.run))
+    if (params.start !== undefined) qs.set('start', params.start)
+    if (params.end !== undefined) qs.set('end', params.end)
+  }
+  return useQuery<LevelSliceDto, ApiRequestError>({
+    queryKey: [db, 'lsm-level', qs.toString()],
+    queryFn: () => fetchJson(`${api(db)}/lsm/level?${qs}`),
+    enabled: params !== null,
   })
 }
 

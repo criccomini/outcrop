@@ -331,6 +331,17 @@ pub struct CompactorStateDto {
     pub compactions: Option<VersionedCompactionsDto>,
 }
 
+/// On-demand SST listing for one level (L0 or a sorted run) restricted to
+/// a key range — the drill-down for levels too large for per-SST detail
+/// in the summary payload.
+#[derive(Serialize, Clone, Debug)]
+pub struct LevelSliceDto {
+    /// SSTs in the level overlapping the requested range.
+    pub total: usize,
+    pub truncated: bool,
+    pub ssts: Vec<SstViewDto>,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct SortedRunSummaryDto {
     pub id: u32,

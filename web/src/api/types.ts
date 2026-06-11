@@ -155,6 +155,13 @@ export interface LevelSummaryDto {
   ssts?: SstViewDto[]
 }
 
+/** On-demand SST listing for one level restricted to a key range. */
+export interface LevelSliceDto {
+  total: number
+  truncated: boolean
+  ssts: SstViewDto[]
+}
+
 export interface SegmentMetaDto {
   prefix: KeyDto
   sst_count: number
