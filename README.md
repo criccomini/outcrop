@@ -19,24 +19,31 @@ decode.
 
 ## Features
 
-- **Overview** — sizes, SST counts, WAL window, epochs, and a storage &
-  garbage summary at a glance.
-- **Alerts** — health warnings (L0 backlog, WAL growth, stale manifests,
-  unswept checkpoints) with a count badge in the nav.
-- **Activity** — one feed of flushes, compactions and GC sweeps; rows link
-  to their diff or expand to the individual objects.
-- **LSM Tree** — levels by size and key-range coverage (overlap reads as
-  read amplification), with per-SST drill-down that scales to huge trees;
-  segment tabs and a manifest-history scrubber.
-- **WAL** — the log listing with the replay window highlighted.
-- **Manifests** — full history, any version in detail, and semantic diffs
-  ("3 L0 SSTs compacted into SR 7").
-- **Compactions** — live compactor state, job history, per-job drill-down.
-- **Checkpoints** — expiry countdowns and clone lineage.
-- **Garbage** — live / pinned / reclaimable breakdown and which checkpoints
-  pin how much.
-- **Search** — manifests, checkpoints, SSTs and compactions by id, ULID,
-  UUID or key.
+- **Works against the bucket, not the database** — reads manifests, SST
+  metadata and object listings straight from object storage. Zero writes,
+  no agent, no cooperation needed from the running writer.
+- **Fleet auto-discovery** — point it at one or more stores (env vars or a
+  TOML config) and every SlateDB under them shows up; no per-DB setup.
+- **Understands SlateDB, not just files** — semantic manifest diffs
+  ("3 L0 SSTs compacted into SR 7"), an activity feed narrating flushes,
+  compactions and GC sweeps, garbage classified live / pinned / reclaimable
+  by the GC's own rules, and health alerts for L0 backlog, WAL growth,
+  stale manifests and stuck GC.
+- **Visualizes the LSM** — levels by size and key-range coverage (overlap
+  reads as read amplification), per-SST drill-down to block index, bloom
+  filter and content stats, segment tabs, and a scrubber that rewinds the
+  tree through manifest history — plus pages for WAL, manifests,
+  compactions, checkpoints, and cross-resource search.
+- **REST API, OpenAPI included** — everything the UI shows is a JSON API,
+  documented by an OpenAPI 3.1 spec with an interactive reference at
+  `/api/docs`; generate typed clients with any OpenAPI generator.
+- **Prometheus metrics** — per-DB gauges at `/metrics`, ready to scrape.
+- **Built to be polled** — object-store reads are cached and shared across
+  viewers, list endpoints are capped, and huge trees ship as bounded
+  summaries, so a wall of open dashboards won't run up your S3 bill.
+- **One binary** — the SPA is embedded; or split it into `--api-only` and
+  `--ui-only` deployments. Includes a demo traffic generator that can seed
+  multi-GiB fleets to explore against.
 
 ## Running
 
