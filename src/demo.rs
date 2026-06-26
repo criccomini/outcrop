@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 
 use slatedb::admin::{Admin, AdminBuilder};
 use slatedb::config::{
-    CheckpointOptions, CompactorOptions, FlushOptions, FlushType, GarbageCollectorDirectoryOptions,
-    GarbageCollectorOptions, PutOptions, Settings, WriteOptions,
+    CheckpointOptions, CompactionWorkerOptions, CompactorOptions, FlushOptions, FlushType,
+    GarbageCollectorDirectoryOptions, GarbageCollectorOptions, PutOptions, Settings, WriteOptions,
 };
 use slatedb::manifest::{SortedRun, SsTableView};
 use slatedb::object_store::local::LocalFileSystem;
@@ -95,7 +95,7 @@ pub struct TrafficArgs {
 
     /// Target SST size: the L0 SST size while seeding and the compactor's
     /// max output SST size. target-size / sst-bytes ≈ final SST count.
-    /// Default: 128KiB for the demo shape, 32MiB for bulk seeding
+    /// Default: 2MiB for the demo shape, 32MiB for bulk seeding
     #[arg(long, value_parser = parse_size)]
     sst_bytes: Option<u64>,
 
@@ -181,7 +181,7 @@ const BULK_VALUES: ByteRange = ByteRange {
     min: 4 << 10,
     max: 64 << 10,
 };
-const DEMO_SST_BYTES: u64 = 128 * 1024;
+const DEMO_SST_BYTES: u64 = 2 << 20;
 const BULK_SST_BYTES: u64 = 32 << 20;
 
 /// Per-DB write-shape parameters, derived once from the flags. Every run
@@ -314,6 +314,10 @@ async fn open_seed_db(
         // Small L0 SSTs so a modest amount of data produces a real tree.
         l0_sst_size_bytes: shape.sst_bytes as usize,
         wal_enabled: !no_wal,
+        // The seed path creates deterministic L0s by flushing explicitly at
+        // wave boundaries. Letting the 100ms background flusher run would
+        // fragment each wave into a burst of tiny L0 SSTs.
+        flush_interval: None,
         // Filter every SST regardless of key count so the dashboard's SST
         // drawer has bloom filters to show.
         min_filter_keys: 0,
@@ -365,7 +369,12 @@ async fn open_bulk_db(
         },
         compactor_options: Some(CompactorOptions {
             poll_interval: Duration::from_millis(500),
-            max_sst_size: shape.sst_bytes as usize,
+            worker: Some(CompactionWorkerOptions {
+                max_sst_size: shape.sst_bytes as usize,
+                min_filter_keys: 0,
+                compactions_poll_interval: Duration::from_millis(500),
+                ..CompactionWorkerOptions::default()
+            }),
             ..CompactorOptions::default()
         }),
         ..Settings::default()
@@ -395,9 +404,13 @@ async fn open_traffic_db(
         // Honor --sst-bytes so churn doesn't re-merge a bulk-seeded DB's
         // many SSTs into default-sized (256MiB) ones.
         compactor_options: Some(CompactorOptions {
-            max_sst_size: sst_bytes
-                .map(|b| b as usize)
-                .unwrap_or_else(|| CompactorOptions::default().max_sst_size),
+            worker: Some(CompactionWorkerOptions {
+                max_sst_size: sst_bytes
+                    .map(|b| b as usize)
+                    .unwrap_or_else(|| CompactionWorkerOptions::default().max_sst_size),
+                min_filter_keys: 0,
+                ..CompactionWorkerOptions::default()
+            }),
             ..CompactorOptions::default()
         }),
         ..Settings::default()
@@ -416,9 +429,9 @@ async fn write_waves(
     written: &mut u64,
     deleted: &mut u64,
 ) -> anyhow::Result<()> {
-    // Don't await durability per write — the flush at the end of each wave
-    // makes everything durable, and serial durable puts would crawl at the
-    // WAL flush interval.
+    // Don't await durability per write — the memtable flush at the end of
+    // each wave makes everything durable, and serial durable puts would
+    // crawl at the WAL flush interval.
     let write_opts = WriteOptions {
         await_durable: false,
         ..Default::default()
@@ -443,7 +456,10 @@ async fn write_waves(
                 *written += 1;
             }
         }
-        db.flush().await?;
+        db.flush_with_options(FlushOptions {
+            flush_type: FlushType::MemTable,
+        })
+        .await?;
         println!("[{tag}] wave {}/{} flushed", wave + 1, args.waves);
     }
     Ok(())
@@ -507,7 +523,21 @@ async fn seed_base(
         let admin = AdminBuilder::new(db_path.to_string(), store.clone()).build();
         let token = CancellationToken::new();
         let stop = token.clone();
-        let handle = tokio::spawn(async move { admin.run_compactor(token).await });
+        let compactor_options = CompactorOptions {
+            poll_interval: Duration::from_millis(500),
+            worker: Some(CompactionWorkerOptions {
+                max_sst_size: shape.sst_bytes as usize,
+                min_filter_keys: 0,
+                compactions_poll_interval: Duration::from_millis(500),
+                ..CompactionWorkerOptions::default()
+            }),
+            ..CompactorOptions::default()
+        };
+        let handle = tokio::spawn(async move {
+            admin
+                .run_compactor_with_options(token, compactor_options)
+                .await
+        });
         tokio::time::sleep(Duration::from_secs(args.compact_secs)).await;
         stop.cancel();
         match handle.await? {
@@ -831,6 +861,7 @@ async fn collect_seed_garbage(
         Some(GarbageCollectorDirectoryOptions {
             interval: None,
             min_age,
+            dry_run: false,
         })
     };
     let mut builder = AdminBuilder::new(db_path.to_string(), store.clone());
@@ -856,9 +887,11 @@ async fn collect_seed_garbage(
         .run_gc_once(GarbageCollectorOptions {
             manifest_options: dir_opts(Duration::from_secs(300)),
             wal_options: dir_opts(Duration::ZERO),
+            wal_fence_options: None,
             compacted_options: dir_opts(Duration::ZERO),
             compactions_options: dir_opts(Duration::from_secs(300)),
             detach_options: None,
+            metric_level: None,
         })
         .await?;
     Ok(())

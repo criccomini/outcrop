@@ -10,7 +10,7 @@ checkpoints) in the object store, so the dashboard needs no cooperation from
 the running writer. It performs **zero writes**: only manifest reads, SST
 metadata reads, and object listings.
 
-Built against SlateDB **0.13.x**; older or newer manifest formats may not
+Built against SlateDB **0.14.x**; older or newer manifest formats may not
 decode.
 
 <p align="center">

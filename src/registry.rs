@@ -186,8 +186,8 @@ mod tests {
     use slatedb::object_store::memory::InMemory;
     use slatedb::object_store::path::Path;
     use slatedb::object_store::{
-        self, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
-        PutOptions, PutPayload, PutResult,
+        self, CopyOptions, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+        ObjectStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult,
     };
 
     /// InMemory wrapper whose delimiter LISTs (what discovery walks) can be
@@ -228,8 +228,11 @@ mod tests {
         ) -> object_store::Result<GetResult> {
             self.inner.get_opts(location, options).await
         }
-        async fn delete(&self, location: &Path) -> object_store::Result<()> {
-            self.inner.delete(location).await
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, object_store::Result<Path>>,
+        ) -> BoxStream<'static, object_store::Result<Path>> {
+            self.inner.delete_stream(locations)
         }
         fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, object_store::Result<ObjectMeta>> {
             self.inner.list(prefix)
@@ -246,11 +249,13 @@ mod tests {
             }
             self.inner.list_with_delimiter(prefix).await
         }
-        async fn copy(&self, from: &Path, to: &Path) -> object_store::Result<()> {
-            self.inner.copy(from, to).await
-        }
-        async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> object_store::Result<()> {
-            self.inner.copy_if_not_exists(from, to).await
+        async fn copy_opts(
+            &self,
+            from: &Path,
+            to: &Path,
+            options: CopyOptions,
+        ) -> object_store::Result<()> {
+            self.inner.copy_opts(from, to, options).await
         }
     }
 

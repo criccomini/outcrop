@@ -105,6 +105,7 @@ pub async fn discover(
 mod tests {
     use super::*;
     use slatedb::object_store::memory::InMemory;
+    use slatedb::object_store::ObjectStoreExt;
 
     async fn store_with(paths: &[&str]) -> InMemory {
         let store = InMemory::new();

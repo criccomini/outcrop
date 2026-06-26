@@ -45,9 +45,9 @@ pub async fn get_one(
     let info = file.info();
     let detail = SstDetailDto {
         ulid: ulid.to_string(),
-        location: meta.location.to_string(),
-        size_bytes: meta.size,
-        last_modified: meta.last_modified,
+        location: meta.metadata.location.to_string(),
+        size_bytes: meta.metadata.size,
+        last_modified: meta.metadata.last_modified,
         info: SstInfoDto {
             first_key: info.first_entry.as_deref().map(key_dto),
             last_key: info.last_entry.as_deref().map(key_dto),

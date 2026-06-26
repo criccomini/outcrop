@@ -8,7 +8,7 @@ license = "Apache-2.0"
 [dependencies]
 # Compression + cloud features enabled so the dashboard can inspect any DB
 # regardless of how it was written.
-slatedb = { version = "0.13.1", features = [
+slatedb = { version = "0.14.0", features = [
     "compression",
     "lz4",
     "zlib",
@@ -20,7 +20,7 @@ slatedb = { version = "0.13.1", features = [
 ] }
 # slatedb's own common crate — version must move in lockstep with slatedb.
 # test-util exposes MockSystemClock for `traffic --time-warp`.
-slatedb-common = { version = "0.13.1", features = ["test-util"] }
+slatedb-common = { version = "0.14.0", features = ["test-util"] }
 anyhow = "1"
 axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }

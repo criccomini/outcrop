@@ -70,4 +70,4 @@ Request flow: `routes::root_router` (`/api/dbs`, dispatcher, `/metrics`) → `Re
 
 ## slatedb crate gotcha
 
-The pinned `slatedb` crates.io release does not match the same-named git tag (e.g. 0.13.1 ≠ `v0.13.1`). When checking what a slatedb API actually does, read the vendored source under `~/.cargo/registry/src/*/slatedb-*/`, not the GitHub repo. To develop against a local checkout, use the commented `[patch.crates-io]` in `Cargo.toml`.
+The pinned `slatedb` crates.io release does not always match the same-named git tag. When checking what a slatedb API actually does, read the vendored source under `~/.cargo/registry/src/*/slatedb-*/`, not the GitHub repo. To develop against a local checkout, use the commented `[patch.crates-io]` in `Cargo.toml`.

@@ -356,7 +356,7 @@ impl AppState {
     pub async fn manifest_entries(&self) -> Result<Arc<Vec<ManifestEntry>>, ApiError> {
         self.manifest_listing
             .get_with(|| async {
-                let prefix = self.root_path.child("manifest");
+                let prefix = self.root_path.clone().join("manifest");
                 let mut stream = self.object_store.list(Some(&prefix));
                 let mut entries = Vec::new();
                 while let Some(meta) = stream
@@ -393,7 +393,7 @@ impl AppState {
     pub async fn wal_entries(&self) -> Result<Arc<Vec<WalEntry>>, ApiError> {
         self.wal_listing
             .get_with(|| async {
-                let prefix = self.root_path.child("wal");
+                let prefix = self.root_path.clone().join("wal");
                 let mut stream = self.object_store.list(Some(&prefix));
                 let mut entries = Vec::new();
                 while let Some(meta) = stream
@@ -428,7 +428,7 @@ impl AppState {
 
     /// One LIST over `compacted/`, full or from an offset, without caching.
     async fn list_compacted(&self, offset: Option<&Path>) -> Result<Vec<CompactedEntry>, ApiError> {
-        let prefix = self.root_path.child("compacted");
+        let prefix = self.root_path.clone().join("compacted");
         let mut stream = match offset {
             Some(offset) => self.object_store.list_with_offset(Some(&prefix), offset),
             None => self.object_store.list(Some(&prefix)),
@@ -483,8 +483,9 @@ impl AppState {
                 Some(last_ulid) => {
                     let offset = self
                         .root_path
-                        .child("compacted")
-                        .child(format!("{last_ulid}.sst"));
+                        .clone()
+                        .join("compacted")
+                        .join(format!("{last_ulid}.sst"));
                     let new = self.list_compacted(Some(&offset)).await?;
                     if !new.is_empty() {
                         self.note_compacted_additions(&new);
@@ -597,6 +598,7 @@ impl AppState {
 mod tests {
     use super::*;
     use slatedb::object_store::memory::InMemory;
+    use slatedb::object_store::ObjectStoreExt;
 
     fn ulid_at(ms: u64, i: u128) -> Ulid {
         Ulid::from_parts(ms, i)
